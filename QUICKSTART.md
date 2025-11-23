@@ -1,162 +1,70 @@
 # Quick Start Guide
 
-Get up and running with Power Spoons in 5 minutes!
+Get up and running with Power Spoons in 2 minutes!
 
-## For New Users
+## Installation
 
-### Step 1: Install Power Spoons
+### Step 1: Install Hammerspoon
 
-Run this one-liner in your terminal:
+If you don't already have Hammerspoon:
 
+**Option A - Download:**
+- Go to [hammerspoon.org](https://www.hammerspoon.org/)
+- Download and install
+
+**Option B - Homebrew:**
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/m0hill/power-spoons/main/scripts/install.sh)"
+brew install --cask hammerspoon
 ```
 
-This will:
-- Install Homebrew (if needed)
-- Install Python 3 (if needed)
-- Clone the power-spoons repository to `~/.power-spoons`
-- Add `hs-pm` to your PATH
+### Step 2: Copy Power Spoons Code
 
-### Step 2: Reload Your Shell
+1. **Open** (or create) the file: `~/.hammerspoon/init.lua`
+   
+   You can do this in Terminal:
+   ```bash
+   open -a TextEdit ~/.hammerspoon/init.lua
+   ```
 
-```bash
-source ~/.zshrc
-# or restart your terminal
-```
+2. **Copy** the entire contents of the [init.lua](init.lua) file from this repository
 
-### Step 3: Initialize Hammerspoon
+3. **Paste** it into your `~/.hammerspoon/init.lua`
 
-```bash
-hs-pm init
-```
+> **Already using Hammerspoon?** No problem! Just paste the Power Spoons code at the **end** of your existing `init.lua`. It won't interfere with your current setup.
 
-This interactive installer will:
-1. Check/install Hammerspoon
-2. Let you choose which spoons to enable
-3. Install dependencies (sox, etc.)
-4. Prompt for API keys
-5. Set up your configuration
+### Step 3: Reload Hammerspoon
 
-### Step 4: Reload Hammerspoon
+Press `Cmd+Ctrl+R` or click the Hammerspoon icon → "Reload Config"
 
-Click the Hammerspoon menubar icon → "Reload Config"
+### Step 4: You're Done!
 
-Or press: `Cmd+Ctrl+R` (if you have the default hotkey)
+Look for the **⚡ icon** in your menubar. Click it to install packages!
 
-### Step 5: Start Using!
-
-**Try Whisper:**
-- Hold `Option+/` to record
-- Speak into your microphone
-- Release to transcribe and paste
-
-**Try Gemini OCR:**
-- Press `Cmd+Shift+S`
-- Select area with text
-- Text is copied to clipboard
-
-**Try Lyrics:**
-- Open Spotify
-- Play a song
-- Lyrics appear automatically
-
-**Try Trimmy:**
-- Copy a multi-line shell command
-- It's automatically flattened
-- Paste it in your terminal
+**What just happened?**
+- The manager fetched the package list from GitHub
+- You can now install packages with one click
+- Packages will be downloaded and cached locally when you install them
 
 ---
 
-## For Existing Hammerspoon Users
+## Installing Your First Package
 
-### Option 1: Full Integration (Recommended)
+Let's install **Whisper Transcription** as an example:
 
-Backup your current config:
-```bash
-cp -r ~/.hammerspoon ~/.hammerspoon.backup
-```
-
-Install power-spoons:
-```bash
-git clone https://github.com/m0hill/power-spoons.git ~/.power-spoons
-echo 'export PATH="$HOME/.power-spoons/scripts:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-hs-pm init
-```
-
-This will replace your `~/.hammerspoon` with power-spoons config.
-
-### Option 2: Partial Integration (Keep Your Config)
-
-Install power-spoons:
-```bash
-git clone https://github.com/m0hill/power-spoons.git ~/.power-spoons
-echo 'export PATH="$HOME/.power-spoons/scripts:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-Add to your existing `~/.hammerspoon/init.lua`:
-
-```lua
--- Add power-spoons to package path
-package.path = package.path .. ";/Users/" .. os.getenv("USER") .. "/.power-spoons/core/?.lua"
-
--- Load the spoons you want
-local menubar = require("lib.menubar")
-local whisper = require("spoons.whisper")
-local lyrics = require("spoons.lyrics")
-
--- Initialize menubar
-menubar.init({
-    mode = "individual",
-    modules = {
-        whisper = {enabled = true, display = "individual"},
-        lyrics = {enabled = true, display = "individual"}
-    }
-})
-
--- Initialize spoons
-whisper.init(menubar)
-lyrics.init(menubar)
-
--- Start any spoons that need it
-lyrics.start()
-```
-
-Create `~/.hammerspoon/.env` with your API keys:
-```bash
-GROQ_API_KEY=your_key_here
-GEMINI_API_KEY=your_key_here
-```
-
-Install dependencies:
-```bash
-brew install sox  # for whisper
-```
-
-Reload Hammerspoon!
-
----
-
-## Common Commands
-
-```bash
-# List available spoons
-hs-pm available
-
-# List what you have installed
-hs-pm list
-
-# Add a spoon
-hs-pm add gemini
-
-# Remove a spoon
-hs-pm remove trimmy
-
-# Update to latest version
-hs-pm update
-```
+1. **Click** the ⚡ icon in your menubar
+2. **Find** "Whisper Transcription" under "Available"
+3. **Click** "+ Whisper Transcription"
+4. **Click** "Install & Enable"
+5. **Set your API key**:
+   - Click ⚡ → "Secrets / API Keys"
+   - Click "Groq API Key" → "Set / Update…"
+   - Paste your API key (get one from [console.groq.com/keys](https://console.groq.com/keys))
+   - Click "Save"
+6. **Install sox** (required for audio recording):
+   ```bash
+   brew install sox
+   ```
+7. **Try it**: Hold `Option+/` to record, release to transcribe!
 
 ---
 
@@ -169,12 +77,9 @@ hs-pm update
 3. Navigate to [API Keys](https://console.groq.com/keys)
 4. Click "Create API Key"
 5. Copy the key
-6. Add to `~/.hammerspoon/.env`:
-   ```
-   GROQ_API_KEY=gsk_...
-   ```
+6. Set it via ⚡ → Secrets / API Keys → Groq API Key → Set / Update…
 
-**Cost**: $0.04 per hour of audio (very cheap!)
+**Cost**: $0.04 per hour of audio (very affordable!)
 
 ### Gemini API (for OCR)
 
@@ -183,85 +88,135 @@ hs-pm update
 3. Click "Create API Key"
 4. Select your Google Cloud project (or create new)
 5. Copy the key
-6. Add to `~/.hammerspoon/.env`:
-   ```
-   GEMINI_API_KEY=AIza...
-   ```
+6. Set it via ⚡ → Secrets / API Keys → Gemini API Key → Set / Update…
 
 **Cost**: Free tier is very generous!
 
 ---
 
+## Package Quick Reference
+
+### Whisper Transcription
+- **Hotkey**: `Option+/` (hold to record, release to transcribe)
+- **Requires**: sox (`brew install sox`), Groq API key
+- **Use case**: Dictate text instead of typing
+
+### Gemini OCR
+- **Hotkey**: `Cmd+Shift+S` (capture screenshot area)
+- **Requires**: Gemini API key
+- **Use case**: Extract text from images/screenshots
+
+### Spotify Lyrics
+- **Hotkey**: None (auto-starts)
+- **Requires**: Spotify app
+- **Use case**: See synced lyrics while listening
+- **Tip**: Drag the overlay to move it, toggle via package menu
+
+### Trimmy
+- **Hotkey**: None (watches clipboard)
+- **Requires**: Nothing!
+- **Use case**: Flatten multi-line shell commands automatically
+- **Settings**: Auto-trim on/off, aggressiveness levels
+
+---
+
+## Managing Packages
+
+Everything is done from the **⚡ menubar icon**:
+
+**To install a package:**
+- Click ⚡ → "+ Package Name" → "Install & Enable"
+
+**To disable/enable:**
+- Click ⚡ → Package name → "Disable" or "Enable"
+
+**To uninstall:**
+- Click ⚡ → Package name → "Uninstall…"
+
+**To configure settings:**
+- Click ⚡ → Package name → (package-specific options)
+
+---
+
 ## Troubleshooting
 
-### "hs-pm: command not found"
-
-Reload your shell:
+### "Whisper says sox is not installed"
 ```bash
-source ~/.zshrc
+brew install sox
+```
+Then reload Hammerspoon.
+
+### "Missing API key"
+- Click ⚡ → Secrets / API Keys
+- Set the required key
+- Try again
+
+### "Package isn't working"
+1. Check if it's enabled (should say "enabled" next to name)
+2. Check Hammerspoon console for errors (menubar → Console)
+3. Try disabling and re-enabling
+
+### "Menubar icon disappeared"
+- Press `Cmd+Ctrl+R` to reload
+- Check Hammerspoon console for errors
+
+### "I want to remove everything"
+- Delete the Power Spoons code from your `init.lua`
+- Reload Hammerspoon
+- (Optional) Clear settings in Hammerspoon console:
+  ```lua
+  hs.settings.set("powerspoons.state", nil)
+  ```
+
+---
+
+## For Advanced Users
+
+### Where is everything stored?
+
+- **Code**: In your `~/.hammerspoon/init.lua` (the file you pasted)
+- **Settings**: Via `hs.settings` under key `powerspoons.state`
+  - Includes: installed packages, enabled state, API keys
+- **Lyrics position**: `powerspoons.lyrics.overlay.frame`
+- **Trimmy settings**: `powerspoons.trimmy.*`
+
+### How do I customize a package?
+
+Edit the package code directly in your `init.lua`:
+
+1. Find the package function (search for "createWhisperPackage", etc.)
+2. Modify the `CONFIG` table at the top
+3. Save and reload Hammerspoon
+
+Example - change Whisper hotkey from `Option+/` to `Cmd+R`:
+```lua
+local CONFIG = {
+    -- ... other settings ...
+    HOTKEY_MODS = { "cmd" },  -- was: { "alt" }
+    HOTKEY_KEY = "r",         -- was: "/"
+}
 ```
 
-Or add to PATH manually:
-```bash
-export PATH="$HOME/.power-spoons/scripts:$PATH"
-```
+### How do I add a new package?
 
-### "Hammerspoon not responding after reload"
+1. Create a package function (see existing packages as examples)
+2. Add it to the `PACKAGES_DEF` array
+3. Reload Hammerspoon
+4. It appears in "Available" packages
 
-Check Hammerspoon console for errors:
-- Click Hammerspoon menubar icon → "Console"
-- Look for red error messages
-
-Common issues:
-- Missing API key → Add to `.env`
-- Missing dependency → Run `brew install sox`
-- Typo in config → Check `~/.hammerspoon/modules_config.lua`
-
-### "Whisper not working"
-
-1. Check sox is installed:
-   ```bash
-   which rec
-   ```
-   If not found:
-   ```bash
-   brew install sox
-   ```
-
-2. Check API key in `~/.hammerspoon/.env`:
-   ```bash
-   cat ~/.hammerspoon/.env | grep GROQ
-   ```
-
-3. Check microphone permissions:
-   - System Settings → Privacy & Security → Microphone
-   - Ensure Hammerspoon is enabled
-
-### "Lyrics not showing"
-
-1. Make sure Spotify is running and playing
-2. Check Hammerspoon console for API errors
-3. Try clicking menubar icon → Show Lyrics
-
-### "OCR not working"
-
-1. Check API key:
-   ```bash
-   cat ~/.hammerspoon/.env | grep GEMINI
-   ```
-
-2. Check internet connection
-3. Try a different screenshot with clear text
+See [README.md#development](README.md#development) for detailed instructions.
 
 ---
 
 ## Next Steps
 
-1. **Customize hotkeys**: Edit spoon files in `~/.power-spoons/core/spoons/`
-2. **Explore settings**: Click menubar icons for each spoon
-3. **Read full docs**: Check out the main [README.md](README.md)
-4. **Contribute**: Add your own spoons! See [Contributing](README.md#-contributing)
+1. **Install all packages** you want to try
+2. **Set API keys** for Whisper and/or Gemini
+3. **Try them out** and customize hotkeys to your liking
+4. **Star the repo** if you find it useful! ⭐
 
 ---
 
 **Need help?** [Open an issue](https://github.com/m0hill/power-spoons/issues)
+
+**Want to contribute?** Check out the [README](README.md)

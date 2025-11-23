@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "packages": [
+    {
+      "id": "whisper",
+      "name": "Whisper Transcription",
+      "description": "Hold Option+/ to record and auto-paste transcription via Groq Whisper.",
+      "version": "1.0.0",
+      "author": "m0hill",
+      "defaultEnabled": false,
+      "hotkey": "Option+/",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/whisper.lua",
+      "secrets": [
+        {
+          "key": "GROQ_API_KEY",
+          "label": "Groq API Key",
+          "hint": "Get from https://console.groq.com/keys"
+        }
+      ],
+      "dependencies": {
+        "system": ["sox"],
+        "note": "Install sox via: brew install sox"
+      }
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini OCR",
+      "description": "Screenshot OCR using Google Gemini. Press Cmd+Shift+S to capture and extract text.",
+      "version": "1.0.0",
+      "author": "m0hill",
+      "defaultEnabled": false,
+      "hotkey": "Cmd+Shift+S",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/gemini.lua",
+      "secrets": [
+        {
+          "key": "GEMINI_API_KEY",
+          "label": "Gemini API Key",
+          "hint": "Get from https://aistudio.google.com/app/apikey"
+        }
+      ],
+      "dependencies": {}
+    },
+    {
+      "id": "lyrics",
+      "name": "Spotify Lyrics",
+      "description": "Floating synchronized lyrics overlay for Spotify.",
+      "version": "1.0.0",
+      "author": "m0hill",
+      "defaultEnabled": false,
+      "hotkey": null,
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/lyrics.lua",
+      "secrets": [],
+      "dependencies": {
+        "apps": ["Spotify"],
+        "note": "Requires Spotify app to be installed"
+      }
+    },
+    {
+      "id": "trimmy",
+      "name": "Trimmy",
+      "description": "Automatically flattens multi-line shell commands in clipboard.",
+      "version": "1.0.0",
+      "author": "m0hill",
+      "defaultEnabled": false,
+      "hotkey": null,
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/trimmy.lua",
+      "secrets": [],
+      "dependencies": {}
+    }
+  ]
+}
