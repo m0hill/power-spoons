@@ -460,6 +460,46 @@ local PowerSpoons = (function()
 						})
 					end
 
+					-- Package-specific secrets (API keys) live inside this package submenu
+					if def.secrets and #def.secrets > 0 then
+						table.insert(submenu, { title = "-" })
+						table.insert(submenu, {
+							title = "API Keys / Secrets",
+							disabled = true,
+						})
+
+						for _, s in ipairs(def.secrets) do
+							local val = state.secrets[s.key]
+							local masked = secretMask(val)
+							local label = s.label or s.key
+							local lineTitle = string.format("%s: %s", label, masked)
+
+							table.insert(submenu, {
+								title = lineTitle,
+								menu = {
+									{
+										title = "Set / Update…",
+										fn = function()
+											openSecretPrompt(s)
+											if state.menubar then
+												state.menubar:setMenu(buildMenu())
+											end
+										end,
+									},
+									{
+										title = "Clear",
+										fn = function()
+											M.setSecret(s.key, nil)
+											if state.menubar then
+												state.menubar:setMenu(buildMenu())
+											end
+										end,
+									},
+								},
+							})
+						end
+					end
+
 					-- Standard interface for package-specific menu items
 					if pkg.instance and pkg.instance.getMenuItems then
 						local menuItems = pkg.instance.getMenuItems()
@@ -549,60 +589,7 @@ local PowerSpoons = (function()
 			table.insert(menu, { title = "-" })
 		end
 
-		-- Secrets section
-		local secretsIndex = {}
-		if state.manifest and state.manifest.packages then
-			for _, def in ipairs(state.manifest.packages) do
-				if def.secrets then
-					for _, s in ipairs(def.secrets) do
-						secretsIndex[s.key] = secretsIndex[s.key] or { def = s, usedBy = {} }
-						table.insert(secretsIndex[s.key].usedBy, def.name)
-					end
-				end
-			end
-		end
-
-		if next(secretsIndex) ~= nil then
-			table.insert(menu, {
-				title = "Secrets / API Keys",
-				disabled = true,
-			})
-
-			for key, entry in pairs(secretsIndex) do
-				local def = entry.def
-				local usedBy = table.concat(entry.usedBy, ", ")
-				local val = state.secrets[key]
-				local masked = secretMask(val)
-
-				local lineTitle = string.format("%s (%s): %s", def.label, usedBy, masked)
-
-				table.insert(menu, {
-					title = lineTitle,
-					menu = {
-						{
-							title = "Set / Update…",
-							fn = function()
-								openSecretPrompt(def)
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
-								end
-							end,
-						},
-						{
-							title = "Clear",
-							fn = function()
-								M.setSecret(def.key, nil)
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
-								end
-							end,
-						},
-					},
-				})
-			end
-
-			table.insert(menu, { title = "-" })
-		end
+		-- Secrets are now managed per-package inside each package submenu.
 
 		-- System section
 		table.insert(menu, {
