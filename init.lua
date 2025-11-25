@@ -4,27 +4,169 @@
 local PowerSpoons = (function()
 	-- Configuration
 	local MANIFEST_URL = "https://raw.githubusercontent.com/m0hill/power-spoons/main/manifest.json"
-	local SETTINGS_KEY = "powerspoons.state"
-	local CACHE_DIR = os.getenv("HOME") .. "/.hammerspoon/powerspoons_cache"
+	local POWERSPOONS_DIR = os.getenv("HOME") .. "/.hammerspoon/powerspoons"
+	local STATE_FILE = POWERSPOONS_DIR .. "/state.json"
+	local SECRETS_FILE = POWERSPOONS_DIR .. "/secrets.json"
+	local SETTINGS_DIR = POWERSPOONS_DIR .. "/settings"
+	local CACHE_DIR = POWERSPOONS_DIR .. "/cache"
 	local AUTO_REFRESH_INTERVAL = 24 * 60 * 60 -- 24 hours
 
-	-- Manager state
+	-- Manager API
 	local M = {}
 
-	local state = {
+	-- Runtime state (ephemeral - never persisted)
+	local runtime = {
 		menubar = nil,
-		packages = {}, -- [id] = { def=manifest_entry, installed=bool, enabled=bool, code=string|nil, instance=obj|nil }
-		secrets = {}, -- [key] = string
-		manifest = nil,
-		lastRefresh = 0,
+		instances = {}, -- [id] = running package instance
 	}
 
 	-- Helpers
-	local function ensureCacheDir()
-		local attrs = hs.fs.attributes(CACHE_DIR)
+	local function ensureDir(path)
+		local attrs = hs.fs.attributes(path)
 		if not attrs then
-			hs.fs.mkdir(CACHE_DIR)
+			hs.fs.mkdir(path)
 		end
+	end
+
+	local function ensurePowerSpoonsDir()
+		ensureDir(POWERSPOONS_DIR)
+		ensureDir(CACHE_DIR)
+		ensureDir(SETTINGS_DIR)
+	end
+
+	local function readJsonFile(filePath, defaultValue)
+		local file = io.open(filePath, "r")
+		if not file then
+			return defaultValue
+		end
+		local content = file:read("*all")
+		file:close()
+
+		if not content or content == "" then
+			return defaultValue
+		end
+
+		local ok, data = pcall(hs.json.decode, content)
+		if not ok or type(data) ~= "table" then
+			return defaultValue
+		end
+
+		return data
+	end
+
+	local function writeJsonFile(filePath, data)
+		local ok, json = pcall(hs.json.encode, data, true)
+		if not ok then
+			return false, "Failed to encode JSON"
+		end
+
+		local file = io.open(filePath, "w")
+		if not file then
+			return false, "Failed to open file for writing"
+		end
+
+		file:write(json)
+		file:close()
+		return true
+	end
+
+	-- Persistence layer
+	local function loadState()
+		local defaultState = {
+			version = 1,
+			manifest = nil,
+			lastRefresh = 0,
+			packages = {}, -- [id] = { installed=bool, enabled=bool }
+		}
+		local state = readJsonFile(STATE_FILE, defaultState)
+		-- Ensure all fields exist
+		state.version = state.version or 1
+		state.manifest = state.manifest or nil
+		state.lastRefresh = state.lastRefresh or 0
+		state.packages = type(state.packages) == "table" and state.packages or {}
+		return state
+	end
+
+	local function saveState(state)
+		ensurePowerSpoonsDir()
+		return writeJsonFile(STATE_FILE, state)
+	end
+
+	local function loadSecrets()
+		local defaultSecrets = {}
+		return readJsonFile(SECRETS_FILE, defaultSecrets)
+	end
+
+	local function saveSecrets(secrets)
+		ensurePowerSpoonsDir()
+		return writeJsonFile(SECRETS_FILE, secrets)
+	end
+
+	-- Migration from old hs.settings to file-based storage
+	local function migrateFromSettings()
+		local OLD_SETTINGS_KEY = "powerspoons.state"
+		local oldData = hs.settings.get(OLD_SETTINGS_KEY)
+		if not oldData or type(oldData) ~= "table" then
+			return false
+		end
+
+		-- Check if migration already happened
+		if hs.fs.attributes(STATE_FILE) then
+			return false
+		end
+
+		print("[Power Spoons] Migrating from hs.settings to file-based storage...")
+
+		-- Migrate state
+		local newState = {
+			version = oldData.version or 1,
+			manifest = oldData.manifest,
+			lastRefresh = oldData.lastRefresh or 0,
+			packages = oldData.packages or {},
+		}
+		saveState(newState)
+
+		-- Migrate secrets
+		if oldData.secrets and type(oldData.secrets) == "table" then
+			saveSecrets(oldData.secrets)
+		end
+
+		-- Migrate package settings
+		-- Known package prefixes: lyrics., trimmy., whisper., gemini.
+		local packagePrefixes = { "lyrics", "trimmy", "whisper", "gemini" }
+		for _, pkgId in ipairs(packagePrefixes) do
+			local prefix = pkgId .. "."
+			local pkgSettings = {}
+			local foundAny = false
+
+			-- Scan all hs.settings keys for this package
+			local allKeys = hs.settings.getKeys() or {}
+			for _, key in ipairs(allKeys) do
+				if key:sub(1, #prefix) == prefix then
+					local settingKey = key:sub(#prefix + 1)
+					pkgSettings[settingKey] = hs.settings.get(key)
+					foundAny = true
+					-- Clear old setting
+					hs.settings.set(key, nil)
+				end
+			end
+
+			if foundAny then
+				M.setSettings(pkgId, pkgSettings)
+				print("[Power Spoons] Migrated settings for package: " .. pkgId)
+			end
+		end
+
+		-- Clear old settings
+		hs.settings.set(OLD_SETTINGS_KEY, nil)
+
+		print("[Power Spoons] Migration complete!")
+		return true
+	end
+
+	-- Helpers (continued)
+	local function ensureCacheDir()
+		ensurePowerSpoonsDir()
 	end
 
 	local function getCacheFilePath(packageId)
@@ -41,59 +183,6 @@ local PowerSpoons = (function()
 			:send()
 	end
 
-	-- Persistence (settings + secrets)
-	local function loadPersistedState()
-		local persisted = hs.settings.get(SETTINGS_KEY)
-		if type(persisted) ~= "table" then
-			persisted = {}
-		end
-		if type(persisted.packages) ~= "table" then
-			persisted.packages = {}
-		end
-		if type(persisted.secrets) ~= "table" then
-			persisted.secrets = {}
-		end
-		if type(persisted.manifest) ~= "table" then
-			persisted.manifest = nil
-		end
-
-		state.secrets = persisted.secrets
-		state.lastRefresh = persisted.lastRefresh or 0
-
-		return persisted.packages, persisted.manifest
-	end
-
-	local function savePersistedState()
-		local persistedPackages = {}
-		for id, pkg in pairs(state.packages) do
-			persistedPackages[id] = {
-				installed = pkg.installed and true or false,
-				enabled = pkg.enabled and true or false,
-			}
-		end
-
-		hs.settings.set(SETTINGS_KEY, {
-			packages = persistedPackages,
-			secrets = state.secrets,
-			manifest = state.manifest,
-			lastRefresh = state.lastRefresh,
-		})
-	end
-
-	-- Secrets API
-	function M.getSecret(key)
-		return state.secrets[key]
-	end
-
-	function M.setSecret(key, value)
-		if value == nil or value == "" then
-			state.secrets[key] = nil
-		else
-			state.secrets[key] = value
-		end
-		savePersistedState()
-	end
-
 	local function secretMask(value)
 		if not value or value == "" then
 			return "[Not set]"
@@ -104,8 +193,59 @@ local PowerSpoons = (function()
 		return "[••••" .. value:sub(-4) .. "]"
 	end
 
+	-- Secrets API
+	function M.getSecret(key)
+		local secrets = loadSecrets()
+		return secrets[key]
+	end
+
+	function M.setSecret(key, value)
+		local secrets = loadSecrets()
+		if value == nil or value == "" then
+			secrets[key] = nil
+		else
+			secrets[key] = value
+		end
+		saveSecrets(secrets)
+	end
+
+	-- Package Settings API
+	-- Each package gets its own settings file: ~/.hammerspoon/powerspoons/settings/{packageId}.json
+	function M.getSetting(packageId, key, defaultValue)
+		local settingsFile = SETTINGS_DIR .. "/" .. packageId .. ".json"
+		local settings = readJsonFile(settingsFile, {})
+		local value = settings[key]
+		if value == nil then
+			return defaultValue
+		end
+		return value
+	end
+
+	function M.setSetting(packageId, key, value)
+		ensurePowerSpoonsDir()
+		local settingsFile = SETTINGS_DIR .. "/" .. packageId .. ".json"
+		local settings = readJsonFile(settingsFile, {})
+		if value == nil then
+			settings[key] = nil
+		else
+			settings[key] = value
+		end
+		return writeJsonFile(settingsFile, settings)
+	end
+
+	function M.getSettings(packageId)
+		local settingsFile = SETTINGS_DIR .. "/" .. packageId .. ".json"
+		return readJsonFile(settingsFile, {})
+	end
+
+	function M.setSettings(packageId, settingsTable)
+		ensurePowerSpoonsDir()
+		local settingsFile = SETTINGS_DIR .. "/" .. packageId .. ".json"
+		return writeJsonFile(settingsFile, settingsTable)
+	end
+
 	local function openSecretPrompt(secretDef)
-		local current = state.secrets[secretDef.key] or ""
+		local current = M.getSecret(secretDef.key) or ""
 		local button, text = hs.dialog.textPrompt(secretDef.label, secretDef.hint or "", current, "Save", "Cancel")
 		if button == "Save" then
 			if text and text ~= "" then
@@ -116,9 +256,31 @@ local PowerSpoons = (function()
 		end
 	end
 
+	-- Package helpers
+	local function getPackageDef(id)
+		local state = loadState()
+		if not state.manifest or not state.manifest.packages then
+			return nil
+		end
+		for _, def in ipairs(state.manifest.packages) do
+			if def.id == id then
+				return def
+			end
+		end
+		return nil
+	end
+
+	local function getPackageFlags(id)
+		local state = loadState()
+		local flags = state.packages[id]
+		if not flags then
+			return { installed = false, enabled = false }
+		end
+		return flags
+	end
+
 	-- Package loading & execution
 	local function loadPackageCode(packageId, code)
-		-- Create a function from the code string
 		local chunkFunc, err = load(code, packageId .. ".lua")
 		if not chunkFunc then
 			return nil, "Failed to load package code: " .. tostring(err)
@@ -149,7 +311,7 @@ local PowerSpoons = (function()
 			return
 		end
 
-		hs.http.asyncGet(url, nil, function(status, body, headers)
+		hs.http.asyncGet(url, nil, function(status, body, _)
 			if status ~= 200 then
 				callback(false, "HTTP " .. tostring(status))
 				return
@@ -175,39 +337,46 @@ local PowerSpoons = (function()
 
 	-- Package lifecycle
 	local function startPackage(id)
-		local pkg = state.packages[id]
-		if not pkg or not pkg.enabled then
+		local flags = getPackageFlags(id)
+		if not flags.installed or not flags.enabled then
 			return
 		end
-		if pkg.instance then
+
+		if runtime.instances[id] then
 			return -- Already running
 		end
 
-		if not pkg.code then
-			-- Try to load from cache
-			local cachePath = getCacheFilePath(id)
-			local file = io.open(cachePath, "r")
-			if file then
-				pkg.code = file:read("*all")
-				file:close()
-			end
-		end
-
-		if not pkg.code then
-			notify("Power Spoons", "Package '" .. id .. "' code not available. Try refreshing.")
+		local def = getPackageDef(id)
+		if not def then
+			notify("Power Spoons", "Package '" .. id .. "' not found in manifest")
 			return
 		end
 
-		local instance, err = loadPackageCode(id, pkg.code)
+		-- Load code from cache
+		local cachePath = getCacheFilePath(id)
+		local file = io.open(cachePath, "r")
+		if not file then
+			notify("Power Spoons", "Package '" .. id .. "' code not cached. Try reinstalling.")
+			return
+		end
+		local code = file:read("*all")
+		file:close()
+
+		if not code then
+			notify("Power Spoons", "Package '" .. id .. "' code not available")
+			return
+		end
+
+		local instance, err = loadPackageCode(id, code)
 		if not instance then
 			notify("Power Spoons", "Failed to load package '" .. id .. "': " .. tostring(err))
 			return
 		end
 
-		pkg.instance = instance
+		runtime.instances[id] = instance
 
-		if pkg.instance.start then
-			local ok, errStart = pcall(pkg.instance.start)
+		if instance.start then
+			local ok, errStart = pcall(instance.start)
 			if not ok then
 				notify("Power Spoons", "Failed to start package '" .. id .. "': " .. tostring(errStart))
 			end
@@ -215,27 +384,26 @@ local PowerSpoons = (function()
 	end
 
 	local function stopPackage(id)
-		local pkg = state.packages[id]
-		if not pkg or not pkg.instance then
+		local instance = runtime.instances[id]
+		if not instance then
 			return
 		end
-		if pkg.instance.stop then
-			pcall(pkg.instance.stop)
+		if instance.stop then
+			pcall(instance.stop)
 		end
-		pkg.instance = nil
+		runtime.instances[id] = nil
 	end
 
 	local function installPackage(id, callback)
-		local pkg = state.packages[id]
-		if not pkg or not pkg.def then
+		local def = getPackageDef(id)
+		if not def then
 			if callback then
 				callback(false, "Package not found")
 			end
 			return
 		end
 
-		-- Download package code
-		downloadPackage(pkg.def, function(success, bodyOrErr)
+		downloadPackage(def, function(success, bodyOrErr)
 			if not success then
 				notify("Power Spoons", "Failed to download '" .. id .. "': " .. tostring(bodyOrErr))
 				if callback then
@@ -244,14 +412,16 @@ local PowerSpoons = (function()
 				return
 			end
 
-			pkg.code = bodyOrErr
-			pkg.installed = true
-			pkg.enabled = true
+			-- Update persistent state
+			local state = loadState()
+			state.packages[id] = {
+				installed = true,
+				enabled = true,
+			}
+			saveState(state)
 
-			savePersistedState()
 			startPackage(id)
-
-			notify("Power Spoons", "Installed: " .. pkg.def.name)
+			notify("Power Spoons", "Installed: " .. def.name)
 
 			if callback then
 				callback(true)
@@ -259,55 +429,57 @@ local PowerSpoons = (function()
 		end)
 	end
 
-	local function togglePackageEnabled(id)
-		local pkg = state.packages[id]
-		if not pkg then
-			return
-		end
-
-		if not pkg.installed then
-			-- Install it
-			installPackage(id, function(success)
-				if success and state.menubar then
-					state.menubar:setMenu(buildMenu())
-				end
-			end)
-			return
-		end
-
-		if pkg.enabled then
-			pkg.enabled = false
-			stopPackage(id)
-		else
-			pkg.enabled = true
-			startPackage(id)
-		end
-		savePersistedState()
-	end
-
 	local function uninstallPackage(id)
-		local pkg = state.packages[id]
-		if not pkg then
-			return
-		end
-
 		stopPackage(id)
-		pkg.enabled = false
-		pkg.installed = false
-		pkg.code = nil
+
+		-- Update persistent state
+		local state = loadState()
+		state.packages[id] = nil
+		saveState(state)
 
 		-- Delete cached file
 		local cachePath = getCacheFilePath(id)
 		if hs.fs.attributes(cachePath) then
 			os.remove(cachePath)
 		end
+	end
 
-		savePersistedState()
+	-- Forward declaration for buildMenu (used in togglePackageEnabled)
+	local buildMenu
+
+	local function togglePackageEnabled(id)
+		local flags = getPackageFlags(id)
+
+		if not flags.installed then
+			-- Install it
+			installPackage(id, function(_)
+				if runtime.menubar then
+					runtime.menubar:setMenu(buildMenu())
+				end
+			end)
+			return
+		end
+
+		-- Toggle enabled state
+		local state = loadState()
+		if not state.packages[id] then
+			state.packages[id] = { installed = true, enabled = false }
+		end
+
+		if state.packages[id].enabled then
+			state.packages[id].enabled = false
+			saveState(state)
+			stopPackage(id)
+		else
+			state.packages[id].enabled = true
+			saveState(state)
+			startPackage(id)
+		end
 	end
 
 	-- Manifest fetching
 	local function fetchManifest(callback)
-		hs.http.asyncGet(MANIFEST_URL, nil, function(status, body, headers)
+		hs.http.asyncGet(MANIFEST_URL, nil, function(status, body, _)
 			if status ~= 200 then
 				if callback then
 					callback(false, "HTTP " .. tostring(status))
@@ -323,9 +495,11 @@ local PowerSpoons = (function()
 				return
 			end
 
+			-- Update persistent state
+			local state = loadState()
 			state.manifest = manifest
 			state.lastRefresh = os.time()
-			savePersistedState()
+			saveState(state)
 
 			if callback then
 				callback(true, manifest)
@@ -347,38 +521,29 @@ local PowerSpoons = (function()
 				return
 			end
 
-			-- Rebuild package state from new manifest
-			local persistedPackages = {}
-			for id, pkg in pairs(state.packages) do
-				persistedPackages[id] = {
-					installed = pkg.installed,
-					enabled = pkg.enabled,
-					code = pkg.code,
-				}
-			end
-
-			state.packages = {}
-
+			-- Stop packages that are no longer in manifest
+			local state = loadState()
+			local validIds = {}
 			if state.manifest and state.manifest.packages then
-				for _, pkgDef in ipairs(state.manifest.packages) do
-					local persisted = persistedPackages[pkgDef.id] or {}
-
-					state.packages[pkgDef.id] = {
-						def = pkgDef,
-						installed = persisted.installed or false,
-						enabled = persisted.enabled or false,
-						code = persisted.code,
-						instance = nil,
-					}
+				for _, def in ipairs(state.manifest.packages) do
+					validIds[def.id] = true
 				end
 			end
 
-			savePersistedState()
+			-- Stop and remove instances for packages not in manifest
+			for id, _ in pairs(runtime.instances) do
+				if not validIds[id] then
+					stopPackage(id)
+				end
+			end
 
 			-- Restart enabled packages
-			for id, pkg in pairs(state.packages) do
-				if pkg.enabled and pkg.installed then
-					startPackage(id)
+			if state.manifest and state.manifest.packages then
+				for _, def in ipairs(state.manifest.packages) do
+					local flags = state.packages[def.id]
+					if flags and flags.installed and flags.enabled then
+						startPackage(def.id)
+					end
 				end
 			end
 
@@ -393,7 +558,8 @@ local PowerSpoons = (function()
 	end
 
 	-- Menubar UI
-	local function buildMenu()
+	buildMenu = function()
+		local state = loadState()
 		local menu = {}
 
 		table.insert(menu, {
@@ -406,8 +572,8 @@ local PowerSpoons = (function()
 		local anyInstalled = false
 		if state.manifest and state.manifest.packages then
 			for _, def in ipairs(state.manifest.packages) do
-				local pkg = state.packages[def.id]
-				if pkg and pkg.installed then
+				local flags = state.packages[def.id]
+				if flags and flags.installed then
 					if not anyInstalled then
 						table.insert(menu, {
 							title = "Installed",
@@ -417,7 +583,7 @@ local PowerSpoons = (function()
 					end
 
 					local status = ""
-					if pkg.enabled then
+					if flags.enabled then
 						status = " (enabled)"
 					else
 						status = " (disabled)"
@@ -425,11 +591,11 @@ local PowerSpoons = (function()
 
 					local submenu = {
 						{
-							title = pkg.enabled and "Disable" or "Enable",
+							title = flags.enabled and "Disable" or "Enable",
 							fn = function()
 								togglePackageEnabled(def.id)
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
+								if runtime.menubar then
+									runtime.menubar:setMenu(buildMenu())
 								end
 							end,
 						},
@@ -437,8 +603,8 @@ local PowerSpoons = (function()
 							title = "Uninstall…",
 							fn = function()
 								uninstallPackage(def.id)
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
+								if runtime.menubar then
+									runtime.menubar:setMenu(buildMenu())
 								end
 							end,
 						},
@@ -470,7 +636,7 @@ local PowerSpoons = (function()
 						})
 					end
 
-					-- Package-specific secrets (API keys) live inside this package submenu
+					-- Package-specific secrets
 					if def.secrets and #def.secrets > 0 then
 						table.insert(submenu, { title = "-" })
 						table.insert(submenu, {
@@ -479,7 +645,7 @@ local PowerSpoons = (function()
 						})
 
 						for _, s in ipairs(def.secrets) do
-							local val = state.secrets[s.key]
+							local val = M.getSecret(s.key)
 							local masked = secretMask(val)
 							local label = s.label or s.key
 							local lineTitle = string.format("%s: %s", label, masked)
@@ -491,8 +657,8 @@ local PowerSpoons = (function()
 										title = "Set / Update…",
 										fn = function()
 											openSecretPrompt(s)
-											if state.menubar then
-												state.menubar:setMenu(buildMenu())
+											if runtime.menubar then
+												runtime.menubar:setMenu(buildMenu())
 											end
 										end,
 									},
@@ -500,8 +666,8 @@ local PowerSpoons = (function()
 										title = "Clear",
 										fn = function()
 											M.setSecret(s.key, nil)
-											if state.menubar then
-												state.menubar:setMenu(buildMenu())
+											if runtime.menubar then
+												runtime.menubar:setMenu(buildMenu())
 											end
 										end,
 									},
@@ -510,9 +676,10 @@ local PowerSpoons = (function()
 						end
 					end
 
-					-- Standard interface for package-specific menu items
-					if pkg.instance and pkg.instance.getMenuItems then
-						local menuItems = pkg.instance.getMenuItems()
+					-- Package-specific menu items
+					local instance = runtime.instances[def.id]
+					if instance and instance.getMenuItems then
+						local menuItems = instance.getMenuItems()
 						if menuItems and #menuItems > 0 then
 							table.insert(submenu, { title = "-" })
 							for _, item in ipairs(menuItems) do
@@ -521,8 +688,8 @@ local PowerSpoons = (function()
 									local originalFn = item.fn
 									item.fn = function()
 										originalFn()
-										if state.menubar then
-											state.menubar:setMenu(buildMenu())
+										if runtime.menubar then
+											runtime.menubar:setMenu(buildMenu())
 										end
 									end
 								end
@@ -533,8 +700,8 @@ local PowerSpoons = (function()
 											local originalSubFn = subitem.fn
 											subitem.fn = function()
 												originalSubFn()
-												if state.menubar then
-													state.menubar:setMenu(buildMenu())
+												if runtime.menubar then
+													runtime.menubar:setMenu(buildMenu())
 												end
 											end
 										end
@@ -561,8 +728,8 @@ local PowerSpoons = (function()
 		local anyAvailable = false
 		if state.manifest and state.manifest.packages then
 			for _, def in ipairs(state.manifest.packages) do
-				local pkg = state.packages[def.id]
-				if not pkg or not pkg.installed then
+				local flags = state.packages[def.id]
+				if not flags or not flags.installed then
 					if not anyAvailable then
 						table.insert(menu, {
 							title = "Available",
@@ -576,8 +743,8 @@ local PowerSpoons = (function()
 							title = "Install & Enable",
 							fn = function()
 								installPackage(def.id, function(success)
-									if state.menubar then
-										state.menubar:setMenu(buildMenu())
+									if runtime.menubar then
+										runtime.menubar:setMenu(buildMenu())
 									end
 								end)
 							end,
@@ -611,15 +778,13 @@ local PowerSpoons = (function()
 			table.insert(menu, { title = "-" })
 		end
 
-		-- Secrets are now managed per-package inside each package submenu.
-
 		-- System section
 		table.insert(menu, {
 			title = "Refresh package list",
 			fn = function()
 				refreshManifest(true, function()
-					if state.menubar then
-						state.menubar:setMenu(buildMenu())
+					if runtime.menubar then
+						runtime.menubar:setMenu(buildMenu())
 					end
 				end)
 			end,
@@ -628,9 +793,10 @@ local PowerSpoons = (function()
 		table.insert(menu, {
 			title = "About Power Spoons…",
 			fn = function()
+				local stateAbout = loadState()
 				local lastRefreshStr = "Never"
-				if state.lastRefresh > 0 then
-					lastRefreshStr = os.date("%Y-%m-%d %H:%M", state.lastRefresh)
+				if stateAbout.lastRefresh > 0 then
+					lastRefreshStr = os.date("%Y-%m-%d %H:%M", stateAbout.lastRefresh)
 				end
 
 				hs.dialog.blockAlert(
@@ -642,8 +808,9 @@ local PowerSpoons = (function()
 • Install/enable/disable packages
 • Manage API keys via UI
 • Packages fetched from GitHub
-• All state stored locally
+• File-based configuration
 
+Config: ~/.hammerspoon/powerspoons/
 Last refresh: %s
 Repository: github.com/m0hill/power-spoons]],
 						lastRefreshStr
@@ -658,70 +825,46 @@ Repository: github.com/m0hill/power-spoons]],
 
 	-- Manager init
 	function M.init()
-		-- Ensure cache directory exists
-		ensureCacheDir()
+		-- Ensure directories exist
+		ensurePowerSpoonsDir()
+
+		-- Migrate from old hs.settings if needed
+		migrateFromSettings()
 
 		-- Create menubar item
-		if not state.menubar then
-			state.menubar = hs.menubar.new()
+		if not runtime.menubar then
+			runtime.menubar = hs.menubar.new()
 		end
-		state.menubar:setTitle("⚡")
-		state.menubar:setTooltip("Power Spoons – Package Manager")
+		runtime.menubar:setTitle("⚡")
+		runtime.menubar:setTooltip("Power Spoons – Package Manager")
 
-		-- Load persisted state
-		local persistedPackages, persistedManifest = loadPersistedState()
+		-- Load persistent state
+		local state = loadState()
 
-		-- Use persisted manifest if available
-		if persistedManifest then
-			state.manifest = persistedManifest
-		end
-
-		-- Build runtime package table from manifest
+		-- Start enabled packages
 		if state.manifest and state.manifest.packages then
-			for _, pkgDef in ipairs(state.manifest.packages) do
-				local persisted = persistedPackages[pkgDef.id] or {}
-
-				state.packages[pkgDef.id] = {
-					def = pkgDef,
-					installed = persisted.installed or false,
-					enabled = persisted.enabled or false,
-					code = nil, -- Will be loaded on demand
-					instance = nil,
-				}
-
-				-- Load code from cache if installed
-				if persisted.installed then
-					local cachePath = getCacheFilePath(pkgDef.id)
-					local file = io.open(cachePath, "r")
-					if file then
-						state.packages[pkgDef.id].code = file:read("*all")
-						file:close()
-					end
+			for _, def in ipairs(state.manifest.packages) do
+				local flags = state.packages[def.id]
+				if flags and flags.installed and flags.enabled then
+					startPackage(def.id)
 				end
 			end
 		end
 
-		-- Start enabled packages
-		for id, pkg in pairs(state.packages) do
-			if pkg.enabled and pkg.installed then
-				startPackage(id)
-			end
-		end
-
 		-- Build initial menu
-		state.menubar:setMenu(buildMenu())
+		runtime.menubar:setMenu(buildMenu())
 
 		-- Auto-refresh manifest if needed
 		local now = os.time()
 		if not state.manifest or (now - state.lastRefresh) > AUTO_REFRESH_INTERVAL then
 			refreshManifest(false, function()
-				if state.menubar then
-					state.menubar:setMenu(buildMenu())
+				if runtime.menubar then
+					runtime.menubar:setMenu(buildMenu())
 				end
 			end)
 		end
 
-		print("[Power Spoons] Initialized. Click the ⚡ icon in the menubar to get started.")
+		print("[Power Spoons] Initialized. Config at ~/.hammerspoon/powerspoons/")
 	end
 
 	return M

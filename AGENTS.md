@@ -3,21 +3,32 @@
 ## Project Structure
 ```
 power-spoons/
-├── init.lua              # Main package manager (copy-paste into user's ~/.hammerspoon/)
+├── init.lua              # Main package manager
 ├── manifest.json         # Package registry with metadata
-└── packages/             # Individual packages (each is a folder)
+├── README.md             # User-facing documentation
+├── AGENTS.md             # This file - for AI agents/contributors
+└── packages/             # Individual packages
     ├── whisper/
-    │   ├── init.lua      # Main package code
-    │   └── README.md     # Package documentation
+    │   ├── init.lua      # Package entry point
+    │   └── README.md     # Package docs
     ├── gemini/
-    │   ├── init.lua
-    │   └── README.md
     ├── lyrics/
-    │   ├── init.lua
-    │   └── README.md
     └── trimmy/
-        ├── init.lua
-        └── README.md
+```
+
+**User Runtime Structure:**
+When installed, creates `~/.hammerspoon/powerspoons/`:
+```
+powerspoons/
+├── state.json            # Package installation state, manifest
+├── secrets.json          # API keys (gitignored)
+├── settings/             # Per-package settings
+│   ├── lyrics.json
+│   ├── trimmy.json
+│   └── ...
+└── cache/                # Downloaded package code
+    ├── whisper.lua
+    └── ...
 ```
 
 **Package Structure Convention:**
@@ -62,11 +73,21 @@ power-spoons/
 - Gracefully handle missing data with fallback messages in UI
 
 ### Secrets Management
-- API keys are stored via Power Spoons manager (Hammerspoon settings)
+- API keys stored in `~/.hammerspoon/powerspoons/secrets.json`
 - Packages declare required secrets in `manifest.json`
 - Access secrets via `manager.getSecret("KEY_NAME")`
 - Never hardcode API keys in source files
 - Users set secrets via GUI in the menubar menu
+
+### Settings Management
+- Each package gets its own settings file: `~/.hammerspoon/powerspoons/settings/{packageId}.json`
+- Access via manager API:
+  ```lua
+  manager.getSetting(packageId, "key", defaultValue)
+  manager.setSetting(packageId, "key", value)
+  ```
+- All settings are JSON - transparent and editable
+- Settings persist across restarts automatically
 
 ### Menubar Integration
 - Packages can expose menu items via `getMenuItems()` function
@@ -74,3 +95,159 @@ power-spoons/
 - Returned menu items are inserted into the package's submenu automatically
 - Manager handles all menubar rendering and updates
 - Packages should call menu refresh after state changes (handled by manager wrapper)
+
+---
+
+## Creating a New Package
+
+### Step 1: Create Package Structure
+
+```bash
+mkdir packages/mypackage
+touch packages/mypackage/init.lua
+touch packages/mypackage/README.md
+```
+
+### Step 2: Write Package Code
+
+**`packages/mypackage/init.lua`:**
+```lua
+return function(manager)
+	local P = {}
+	local PACKAGE_ID = "mypackage"
+	
+	-- Package state
+	local myState = nil
+	
+	-- Load settings
+	local myConfig = manager.getSetting(PACKAGE_ID, "config", "default")
+	
+	function P.start()
+		-- Initialize your package
+		hs.notify.new({title="My Package", informativeText="Started!"}):send()
+		
+		-- Example: set up hotkey
+		hs.hotkey.bind({"cmd", "shift"}, "m", function()
+			-- Do something
+			manager.setSetting(PACKAGE_ID, "lastUsed", os.time())
+		end)
+	end
+	
+	function P.stop()
+		-- Clean up resources
+		hs.hotkey.deleteAll()
+	end
+	
+	function P.getMenuItems()
+		return {
+			{
+				title = "My Action",
+				fn = function()
+					-- Handle menu click
+				end
+			}
+		}
+	end
+	
+	return P
+end
+```
+
+### Step 3: Add to Manifest
+
+**`manifest.json`:**
+```json
+{
+  "packages": [
+    {
+      "id": "mypackage",
+      "name": "My Package",
+      "version": "1.0.0",
+      "description": "Does something cool",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/mypackage/init.lua",
+      "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/mypackage/README.md",
+      "hotkey": "Cmd+Shift+M",
+      "secrets": [
+        {
+          "key": "MY_API_KEY",
+          "label": "My API Key",
+          "hint": "Get your key from https://example.com/api"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Step 4: Document Your Package
+
+**`packages/mypackage/README.md`:**
+```markdown
+# My Package
+
+Does something cool.
+
+## Setup
+
+1. Install via Power Spoons menubar
+2. Set your API key if needed
+3. Use hotkey Cmd+Shift+M
+
+## Settings
+
+- `config` - Main configuration option (default: "default")
+- `lastUsed` - Timestamp of last usage
+
+Settings stored in `~/.hammerspoon/powerspoons/settings/mypackage.json`
+```
+
+### Step 5: Test
+
+1. Copy `init.lua` to your `~/.hammerspoon/init.lua`
+2. Reload Hammerspoon
+3. Click ⚡ menubar icon
+4. Your package appears in "Available"
+5. Install and test
+
+### Step 6: Commit
+
+```bash
+git add packages/mypackage/
+git add manifest.json
+git commit -m "Add mypackage"
+git push
+```
+
+Users will see your package after clicking "Refresh package list"!
+
+## Manager API Reference
+
+### Secrets
+```lua
+manager.getSecret(key)                    -- Get API key
+manager.setSecret(key, value)             -- Set API key (usually via GUI)
+```
+
+### Settings
+```lua
+manager.getSetting(packageId, key, default)     -- Get setting with default
+manager.setSetting(packageId, key, value)       -- Set setting
+manager.getSettings(packageId)                  -- Get all settings as table
+manager.setSettings(packageId, table)           -- Set all settings
+```
+
+## Package Lifecycle
+
+1. **Installation:** User clicks "Install" → Code downloaded to cache → State updated
+2. **Start:** Code loaded from cache → Factory function executed → `start()` called
+3. **Stop:** `stop()` called → Instance removed from runtime
+4. **Uninstall:** `stop()` called → Cache file deleted → State updated
+
+## Persistence
+
+- **Package code:** `~/.hammerspoon/powerspoons/cache/{packageId}.lua`
+- **Secrets:** `~/.hammerspoon/powerspoons/secrets.json`
+- **Settings:** `~/.hammerspoon/powerspoons/settings/{packageId}.json`
+- **Installation state:** `~/.hammerspoon/powerspoons/state.json`
+
+All files are JSON (except cached Lua code) - fully transparent and editable.

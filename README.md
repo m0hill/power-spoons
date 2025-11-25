@@ -19,7 +19,7 @@ Replace bloated Electron apps with lightweight, native macOS automation using Lu
 - **One copy-paste**: Single snippet to get started
 - **One icon**: All packages managed from one menubar icon
 - **Visual management**: Install/uninstall with clicks, not commands
-- **Secure**: API keys stored locally via Hammerspoon settings
+- **Transparent**: All config stored in readable JSON files
 - **Works everywhere**: New users and existing Hammerspoon users alike
 
 ---
@@ -114,12 +114,30 @@ Everything is done from the **⚡ menubar icon**:
 
 **Setting API Keys:**
 1. Click ⚡ icon
-2. Go to "Secrets / API Keys"
-3. Click "Set / Update…" for the key you need
-4. Paste your API key and click "Save"
+2. Click on an installed package
+3. Find "API Keys / Secrets" section
+4. Click "Set / Update…" for the key you need
+5. Paste your API key and click "Save"
 
 **Uninstalling:**
 - Click package name → "Uninstall…"
+
+### Configuration Files
+
+All settings stored in `~/.hammerspoon/powerspoons/`:
+
+```
+powerspoons/
+├── state.json          # Package installation state
+├── secrets.json        # API keys (gitignore this!)
+├── settings/           # Per-package settings
+│   ├── lyrics.json
+│   ├── trimmy.json
+│   └── ...
+└── cache/              # Downloaded package code
+```
+
+**All files are JSON** - you can view and edit them directly! Perfect for version control and portability.
 
 ### Package-Specific Settings
 
@@ -365,25 +383,19 @@ Settings are stored via `hs.settings` under the key `powerspoons.state` (not in 
 **"I want to completely remove Power Spoons"**
 - Delete the Power Spoons code from your `init.lua`
 - Reload config
-- (Optional) Clear settings: `hs.settings.set("powerspoons.state", nil)` in Hammerspoon console
+- (Optional) Delete config directory: `rm -rf ~/.hammerspoon/powerspoons`
 
 ---
 
-## Migration from Old Power Spoons
+## For Contributors
 
-If you were using the old installation system:
+Want to add a new package? See [AGENTS.md](AGENTS.md) for the complete development guide.
 
-1. **Back up** your `~/.hammerspoon/.env` file (contains API keys)
-2. **Remove old installation**:
-   ```bash
-   rm -rf ~/.power-spoons
-   rm -rf ~/.hammerspoon/lib
-   rm -rf ~/.hammerspoon/spoons
-   ```
-3. **Follow the new installation** instructions above
-4. **Set API keys** via the menubar (they're no longer in `.env`)
-
-Your old `.env` file is safe to delete once you've transferred the keys.
+Quick overview:
+1. Create `packages/yourpackage/init.lua` (returns factory function)
+2. Add entry to `manifest.json`
+3. Test locally, then push
+4. Users see it after "Refresh package list"
 
 ---
 

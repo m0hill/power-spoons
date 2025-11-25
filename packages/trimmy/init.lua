@@ -1,20 +1,20 @@
 return function(manager)
 	local P = {}
 
-	local SETTINGS_PREFIX = "powerspoons.trimmy."
+	local PACKAGE_ID = "trimmy"
 	local POLL_INTERVAL = 0.15
 
 	local settings = {
-		aggressiveness = hs.settings.get(SETTINGS_PREFIX .. "aggressiveness") or "normal",
-		preserveBlankLines = hs.settings.get(SETTINGS_PREFIX .. "preserveBlankLines") or false,
-		autoTrimEnabled = hs.settings.get(SETTINGS_PREFIX .. "autoTrimEnabled") or true,
+		aggressiveness = manager.getSetting(PACKAGE_ID, "aggressiveness", "normal"),
+		preserveBlankLines = manager.getSetting(PACKAGE_ID, "preserveBlankLines", false),
+		autoTrimEnabled = manager.getSetting(PACKAGE_ID, "autoTrimEnabled", true),
 	}
 
 	local lastChangeCount = hs.pasteboard.changeCount()
 	local clipboardWatcher = nil
 
 	local function saveSetting(key, value)
-		hs.settings.set(SETTINGS_PREFIX .. key, value)
+		manager.setSetting(PACKAGE_ID, key, value)
 	end
 
 	local function getScoreThreshold()

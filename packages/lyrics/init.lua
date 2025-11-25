@@ -1,9 +1,8 @@
 return function(manager)
 	local P = {}
 
+	local PACKAGE_ID = "lyrics"
 	local POLL_INTERVAL = 0.5
-	local OVERLAY_SETTINGS_KEY = "powerspoons.lyrics.overlay.frame"
-	local OVERLAY_VISIBLE_KEY = "powerspoons.lyrics.overlay.visible"
 	local API_ENDPOINT = "https://lrclib.net/api/get"
 
 	local pollTimer = nil
@@ -66,7 +65,7 @@ return function(manager)
 			return overlay
 		end
 
-		local frame = hs.settings.get(OVERLAY_SETTINGS_KEY)
+		local frame = manager.getSetting(PACKAGE_ID, "overlay.frame")
 		if not frame then
 			local screen = hs.screen.mainScreen():frame()
 			local width = math.min(600, math.floor(screen.w * 0.45))
@@ -153,7 +152,7 @@ return function(manager)
 							end
 						elseif event:getType() == hs.eventtap.event.types.leftMouseUp then
 							if dragContext then
-								hs.settings.set(OVERLAY_SETTINGS_KEY, canvas:frame())
+								manager.setSetting(PACKAGE_ID, "overlay.frame", canvas:frame())
 								dragContext = nil
 							end
 							if dragEventTap then
@@ -167,10 +166,7 @@ return function(manager)
 			end
 		end)
 
-		local visible = hs.settings.get(OVERLAY_VISIBLE_KEY)
-		if visible == nil then
-			visible = true
-		end
+		local visible = manager.getSetting(PACKAGE_ID, "overlay.visible", true)
 
 		if visible then
 			overlay:show()
@@ -439,13 +435,9 @@ end if
 	end
 
 	function P.toggleVisibility()
-		local visible = hs.settings.get(OVERLAY_VISIBLE_KEY)
-		if visible == nil then
-			visible = true
-		end
-
+		local visible = manager.getSetting(PACKAGE_ID, "overlay.visible", true)
 		local newVisible = not visible
-		hs.settings.set(OVERLAY_VISIBLE_KEY, newVisible)
+		manager.setSetting(PACKAGE_ID, "overlay.visible", newVisible)
 
 		if overlay then
 			if newVisible then
@@ -457,11 +449,7 @@ end if
 	end
 
 	function P.isVisible()
-		local visible = hs.settings.get(OVERLAY_VISIBLE_KEY)
-		if visible == nil then
-			visible = true
-		end
-		return visible
+		return manager.getSetting(PACKAGE_ID, "overlay.visible", true)
 	end
 
 	function P.getMenuItems()
