@@ -4,12 +4,13 @@
     {
       "id": "whisper",
       "name": "Whisper Transcription",
-      "description": "Hold Option+/ to record and auto-paste transcription via Groq Whisper.",
+      "description": "Hold Option+/ to record and auto-paste transcription.",
+      "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/whisper/README.md",
       "version": "1.0.0",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkey": "Option+/",
-      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/whisper.lua",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/whisper/init.lua",
       "secrets": [
         {
           "key": "GROQ_API_KEY",
@@ -25,12 +26,13 @@
     {
       "id": "gemini",
       "name": "Gemini OCR",
-      "description": "Screenshot OCR using Google Gemini. Press Cmd+Shift+S to capture and extract text.",
+      "description": "Screenshot OCR using Google Gemini.",
+      "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/gemini/README.md",
       "version": "1.0.0",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkey": "Cmd+Shift+S",
-      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/gemini.lua",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/gemini/init.lua",
       "secrets": [
         {
           "key": "GEMINI_API_KEY",
@@ -43,12 +45,13 @@
     {
       "id": "lyrics",
       "name": "Spotify Lyrics",
-      "description": "Floating synchronized lyrics overlay for Spotify.",
+      "description": "Floating synchronized lyrics overlay.",
+      "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/lyrics/README.md",
       "version": "1.0.0",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkey": null,
-      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/lyrics.lua",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/lyrics/init.lua",
       "secrets": [],
       "dependencies": {
         "apps": ["Spotify"],
@@ -58,12 +61,13 @@
     {
       "id": "trimmy",
       "name": "Trimmy",
-      "description": "Automatically flattens multi-line shell commands in clipboard.",
+      "description": "Flattens multi-line shell commands.",
+      "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/trimmy/README.md",
       "version": "1.0.0",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkey": null,
-      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/trimmy.lua",
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/trimmy/init.lua",
       "secrets": [],
       "dependencies": {}
     }

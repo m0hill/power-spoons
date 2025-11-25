@@ -444,7 +444,7 @@ local PowerSpoons = (function()
 						},
 						{ title = "-" },
 						{
-							title = "Description: " .. (def.description or ""),
+							title = def.description or "",
 							disabled = true,
 						},
 						{
@@ -452,6 +452,16 @@ local PowerSpoons = (function()
 							disabled = true,
 						},
 					}
+
+					-- Add README link if available
+					if def.readme then
+						table.insert(submenu, {
+							title = "ℹ️  View README…",
+							fn = function()
+								hs.urlevent.openURL(def.readme)
+							end,
+						})
+					end
 
 					if def.hotkey then
 						table.insert(submenu, {
@@ -561,25 +571,37 @@ local PowerSpoons = (function()
 						anyAvailable = true
 					end
 
+					local availableSubmenu = {
+						{
+							title = "Install & Enable",
+							fn = function()
+								installPackage(def.id, function(success)
+									if state.menubar then
+										state.menubar:setMenu(buildMenu())
+									end
+								end)
+							end,
+						},
+						{ title = "-" },
+						{
+							title = def.description or "",
+							disabled = true,
+						},
+					}
+
+					-- Add README link if available
+					if def.readme then
+						table.insert(availableSubmenu, {
+							title = "ℹ️  View README…",
+							fn = function()
+								hs.urlevent.openURL(def.readme)
+							end,
+						})
+					end
+
 					table.insert(menu, {
 						title = "+ " .. def.name,
-						menu = {
-							{
-								title = "Install & Enable",
-								fn = function()
-									installPackage(def.id, function(success)
-										if state.menubar then
-											state.menubar:setMenu(buildMenu())
-										end
-									end)
-								end,
-							},
-							{ title = "-" },
-							{
-								title = def.description or "",
-								disabled = true,
-							},
-						},
+						menu = availableSubmenu,
 					})
 				end
 			end
