@@ -39,8 +39,7 @@ return function(manager)
 		if trimmed:sub(-1) == "." then
 			return false
 		end
-		return trimmed:match("^sudo%s+[A-Za-z0-9./~_-]+") ~= nil
-			or trimmed:match("^[A-Za-z0-9./~_-]+") ~= nil
+		return trimmed:match("^sudo%s+[A-Za-z0-9./~_-]+") ~= nil or trimmed:match("^[A-Za-z0-9./~_-]+") ~= nil
 	end
 
 	local function flatten(text)

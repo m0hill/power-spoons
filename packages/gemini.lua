@@ -50,9 +50,7 @@ return function(manager)
 		if not CONFIG.ENABLE_NOTIFY then
 			return
 		end
-		hs.notify
-			.new({ title = title, informativeText = text or "", withdrawAfter = 4 })
-			:send()
+		hs.notify.new({ title = title, informativeText = text or "", withdrawAfter = 4 }):send()
 	end
 
 	local function cleanUp(path)
@@ -153,9 +151,7 @@ return function(manager)
 			["x-goog-api-key"] = apiKey,
 		}
 
-		local apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/"
-			.. CONFIG.MODEL
-			.. ":generateContent"
+		local apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" .. CONFIG.MODEL .. ":generateContent"
 
 		playSound("process")
 
@@ -197,8 +193,7 @@ return function(manager)
 		end
 
 		local tmpDir = hs.fs.temporaryDirectory()
-		local tmpPath = tmpDir
-			.. string.format("powerspoons_gemini_%d.png", hs.timer.absoluteTime())
+		local tmpPath = tmpDir .. string.format("powerspoons_gemini_%d.png", hs.timer.absoluteTime())
 		state.busy = true
 
 		state.timer = hs.timer.doAfter(CONFIG.SCREENSHOT_TIMEOUT, function()

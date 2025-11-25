@@ -118,13 +118,7 @@ local PowerSpoons = (function()
 
 	local function openSecretPrompt(secretDef)
 		local current = state.secrets[secretDef.key] or ""
-		local button, text = hs.dialog.textPrompt(
-			secretDef.label,
-			secretDef.hint or "",
-			current,
-			"Save",
-			"Cancel"
-		)
+		local button, text = hs.dialog.textPrompt(secretDef.label, secretDef.hint or "", current, "Save", "Cancel")
 		if button == "Save" then
 			if text and text ~= "" then
 				M.setSecret(secretDef.key, text)

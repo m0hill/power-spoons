@@ -16,6 +16,8 @@ return function(manager)
 	local currentTrackState = nil
 	local lyricsState = nil
 	local fetchToken = 0
+	local dragContext = nil
+	local dragEventTap = nil
 
 	local function formatTime(seconds)
 		if not seconds or seconds < 0 then
@@ -124,6 +126,49 @@ return function(manager)
 			textSize = 18,
 			textLineBreak = "truncateTail",
 		})
+
+		overlay:mouseCallback(function(canvas, message, elementId, x, y)
+			if message == "mouseDown" and elementId == "background" then
+				local mousePos = hs.mouse.absolutePosition()
+				dragContext = {
+					origin = mousePos,
+					frameStart = canvas:frame(),
+				}
+
+				if dragEventTap then
+					dragEventTap:stop()
+				end
+
+				dragEventTap = hs.eventtap
+					.new({ hs.eventtap.event.types.leftMouseDragged, hs.eventtap.event.types.leftMouseUp }, function(event)
+						if event:getType() == hs.eventtap.event.types.leftMouseDragged then
+							if dragContext then
+								local mousePos = hs.mouse.absolutePosition()
+								local dx = mousePos.x - dragContext.origin.x
+								local dy = mousePos.y - dragContext.origin.y
+								local frame = dragContext.frameStart
+								canvas:frame({
+									x = frame.x + dx,
+									y = frame.y + dy,
+									w = frame.w,
+									h = frame.h,
+								})
+							end
+						elseif event:getType() == hs.eventtap.event.types.leftMouseUp then
+							if dragContext then
+								hs.settings.set(OVERLAY_SETTINGS_KEY, canvas:frame())
+								dragContext = nil
+							end
+							if dragEventTap then
+								dragEventTap:stop()
+								dragEventTap = nil
+							end
+						end
+						return false
+					end)
+					:start()
+			end
+		end)
 
 		local visible = hs.settings.get(OVERLAY_VISIBLE_KEY)
 		if visible == nil then
@@ -383,12 +428,17 @@ end if
 			pollTimer:stop()
 			pollTimer = nil
 		end
+		if dragEventTap then
+			dragEventTap:stop()
+			dragEventTap = nil
+		end
 		if overlay then
 			overlay:delete()
 			overlay = nil
 		end
 		currentTrackId = nil
 		lyricsState = nil
+		dragContext = nil
 	end
 
 	function P.toggleVisibility()

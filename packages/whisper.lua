@@ -80,11 +80,7 @@ return function(manager)
 
 	local function tmpWavPath()
 		local dir = os.getenv("TMPDIR") or "/tmp/"
-		local name = string.format(
-			"powerspoons-whisper-%d-%d.wav",
-			os.time(),
-			math.random(1000, 9999)
-		)
+		local name = string.format("powerspoons-whisper-%d-%d.wav", os.time(), math.random(1000, 9999))
 		return dir .. name
 	end
 
@@ -105,10 +101,7 @@ return function(manager)
 	local function transcribeAudio(path)
 		local apiKey = manager.getSecret("GROQ_API_KEY")
 		if not apiKey or apiKey == "" then
-			notify(
-				"Whisper",
-				"Missing Groq API key.\nSet it via Power Spoons → Secrets."
-			)
+			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
 			if path then
 				os.remove(path)
 			end
@@ -208,10 +201,7 @@ return function(manager)
 
 	local function startRecording()
 		if is_busy then
-			notify(
-				"Whisper",
-				"Currently transcribing. Wait for it to finish."
-			)
+			notify("Whisper", "Currently transcribing. Wait for it to finish.")
 			return
 		end
 		if is_recording then
@@ -222,10 +212,7 @@ return function(manager)
 		if not rec_path then
 			rec_path = which("rec")
 			if not rec_path then
-				notify(
-					"Whisper",
-					"'sox' is not installed.\nInstall via: brew install sox"
-				)
+				notify("Whisper", "'sox' is not installed.\nInstall via: brew install sox")
 				return
 			end
 		end
@@ -252,10 +239,7 @@ return function(manager)
 			return
 		end
 
-		stop_timer = hs.timer.doAfter(
-			CONFIG.MAX_HOLD_SECONDS,
-			stopRecordingAndTranscribe
-		)
+		stop_timer = hs.timer.doAfter(CONFIG.MAX_HOLD_SECONDS, stopRecordingAndTranscribe)
 
 		notify(
 			"Whisper",
@@ -273,12 +257,7 @@ return function(manager)
 			hotkey:delete()
 			hotkey = nil
 		end
-		hotkey = hs.hotkey.bind(
-			CONFIG.HOTKEY_MODS,
-			CONFIG.HOTKEY_KEY,
-			startRecording,
-			stopRecordingAndTranscribe
-		)
+		hotkey = hs.hotkey.bind(CONFIG.HOTKEY_MODS, CONFIG.HOTKEY_KEY, startRecording, stopRecordingAndTranscribe)
 	end
 
 	function P.stop()
