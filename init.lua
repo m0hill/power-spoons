@@ -1,20 +1,14 @@
-----------------------------------------------------------------------
 -- Power Spoons – Remote Package Manager for Hammerspoon
 -- Paste this into your ~/.hammerspoon/init.lua and reload config.
-----------------------------------------------------------------------
 
 local PowerSpoons = (function()
-	------------------------------------------------------------------
 	-- Configuration
-	------------------------------------------------------------------
 	local MANIFEST_URL = "https://raw.githubusercontent.com/m0hill/power-spoons/main/manifest.json"
 	local SETTINGS_KEY = "powerspoons.state"
 	local CACHE_DIR = os.getenv("HOME") .. "/.hammerspoon/powerspoons_cache"
 	local AUTO_REFRESH_INTERVAL = 24 * 60 * 60 -- 24 hours
 
-	------------------------------------------------------------------
 	-- Manager state
-	------------------------------------------------------------------
 	local M = {}
 
 	local state = {
@@ -25,9 +19,7 @@ local PowerSpoons = (function()
 		lastRefresh = 0,
 	}
 
-	------------------------------------------------------------------
 	-- Helpers
-	------------------------------------------------------------------
 	local function ensureCacheDir()
 		local attrs = hs.fs.attributes(CACHE_DIR)
 		if not attrs then
@@ -49,9 +41,7 @@ local PowerSpoons = (function()
 			:send()
 	end
 
-	------------------------------------------------------------------
 	-- Persistence (settings + secrets)
-	------------------------------------------------------------------
 	local function loadPersistedState()
 		local persisted = hs.settings.get(SETTINGS_KEY)
 		if type(persisted) ~= "table" then
@@ -90,9 +80,7 @@ local PowerSpoons = (function()
 		})
 	end
 
-	------------------------------------------------------------------
 	-- Secrets API
-	------------------------------------------------------------------
 	function M.getSecret(key)
 		return state.secrets[key]
 	end
@@ -128,9 +116,7 @@ local PowerSpoons = (function()
 		end
 	end
 
-	------------------------------------------------------------------
 	-- Package loading & execution
-	------------------------------------------------------------------
 	local function loadPackageCode(packageId, code)
 		-- Create a function from the code string
 		local chunkFunc, err = load(code, packageId .. ".lua")
@@ -138,7 +124,6 @@ local PowerSpoons = (function()
 			return nil, "Failed to load package code: " .. tostring(err)
 		end
 
-		-- Execute the chunk to get the package factory function
 		local ok, factoryOrErr = pcall(chunkFunc)
 		if not ok then
 			return nil, "Failed to execute package code: " .. tostring(factoryOrErr)
@@ -148,7 +133,6 @@ local PowerSpoons = (function()
 			return nil, "Package must return a function"
 		end
 
-		-- Call the factory function with manager
 		local ok2, packageOrErr = pcall(factoryOrErr, M)
 		if not ok2 then
 			return nil, "Failed to create package instance: " .. tostring(packageOrErr)
@@ -157,9 +141,7 @@ local PowerSpoons = (function()
 		return packageOrErr, nil
 	end
 
-	------------------------------------------------------------------
 	-- Package download
-	------------------------------------------------------------------
 	local function downloadPackage(packageDef, callback)
 		local url = packageDef.source
 		if not url then
@@ -191,9 +173,7 @@ local PowerSpoons = (function()
 		end)
 	end
 
-	------------------------------------------------------------------
 	-- Package lifecycle
-	------------------------------------------------------------------
 	local function startPackage(id)
 		local pkg = state.packages[id]
 		if not pkg or not pkg.enabled then
@@ -325,9 +305,7 @@ local PowerSpoons = (function()
 		savePersistedState()
 	end
 
-	------------------------------------------------------------------
 	-- Manifest fetching
-	------------------------------------------------------------------
 	local function fetchManifest(callback)
 		hs.http.asyncGet(MANIFEST_URL, nil, function(status, body, headers)
 			if status ~= 200 then
@@ -414,9 +392,7 @@ local PowerSpoons = (function()
 		end)
 	end
 
-	------------------------------------------------------------------
 	-- Menubar UI
-	------------------------------------------------------------------
 	local function buildMenu()
 		local menu = {}
 
@@ -484,80 +460,39 @@ local PowerSpoons = (function()
 						})
 					end
 
-					-- Special handling for Lyrics package
-					if def.id == "lyrics" and pkg.instance and pkg.instance.toggleVisibility then
-						table.insert(submenu, { title = "-" })
-						table.insert(submenu, {
-							title = (pkg.instance.isVisible() and "Hide" or "Show") .. " Overlay",
-							fn = function()
-								pkg.instance.toggleVisibility()
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
-								end
-							end,
-						})
-					end
-
-					-- Special handling for Trimmy package
-					if def.id == "trimmy" and pkg.instance and pkg.instance.getSettings then
-						table.insert(submenu, { title = "-" })
-						local settings = pkg.instance.getSettings()
-						table.insert(submenu, {
-							title = "Trim Clipboard Now",
-							fn = function()
-								pkg.instance.trimNow()
-							end,
-						})
-						table.insert(submenu, {
-							title = (settings.autoTrimEnabled and "✓ " or "") .. "Auto-Trim",
-							fn = function()
-								pkg.instance.toggleAutoTrim()
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
-								end
-							end,
-						})
-						table.insert(submenu, {
-							title = "Aggressiveness",
-							menu = {
-								{
-									title = (settings.aggressiveness == "low" and "✓ " or "") .. "Low (safer)",
-									fn = function()
-										pkg.instance.setAggressiveness("low")
+					-- Standard interface for package-specific menu items
+					if pkg.instance and pkg.instance.getMenuItems then
+						local menuItems = pkg.instance.getMenuItems()
+						if menuItems and #menuItems > 0 then
+							table.insert(submenu, { title = "-" })
+							for _, item in ipairs(menuItems) do
+								-- Wrap menu item functions to refresh menubar
+								if item.fn then
+									local originalFn = item.fn
+									item.fn = function()
+										originalFn()
 										if state.menubar then
 											state.menubar:setMenu(buildMenu())
 										end
-									end,
-								},
-								{
-									title = (settings.aggressiveness == "normal" and "✓ " or "") .. "Normal",
-									fn = function()
-										pkg.instance.setAggressiveness("normal")
-										if state.menubar then
-											state.menubar:setMenu(buildMenu())
-										end
-									end,
-								},
-								{
-									title = (settings.aggressiveness == "high" and "✓ " or "") .. "High (more eager)",
-									fn = function()
-										pkg.instance.setAggressiveness("high")
-										if state.menubar then
-											state.menubar:setMenu(buildMenu())
-										end
-									end,
-								},
-							},
-						})
-						table.insert(submenu, {
-							title = (settings.preserveBlankLines and "✓ " or "") .. "Keep blank lines",
-							fn = function()
-								pkg.instance.togglePreserveBlankLines()
-								if state.menubar then
-									state.menubar:setMenu(buildMenu())
+									end
 								end
-							end,
-						})
+								-- Handle nested submenus
+								if item.menu then
+									for _, subitem in ipairs(item.menu) do
+										if subitem.fn then
+											local originalSubFn = subitem.fn
+											subitem.fn = function()
+												originalSubFn()
+												if state.menubar then
+													state.menubar:setMenu(buildMenu())
+												end
+											end
+										end
+									end
+								end
+								table.insert(submenu, item)
+							end
+						end
 					end
 
 					table.insert(menu, {
@@ -712,9 +647,7 @@ Repository: github.com/m0hill/power-spoons]],
 		return menu
 	end
 
-	------------------------------------------------------------------
 	-- Manager init
-	------------------------------------------------------------------
 	function M.init()
 		-- Ensure cache directory exists
 		ensureCacheDir()

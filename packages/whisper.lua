@@ -1,7 +1,3 @@
--- Whisper Transcription Package
--- Version: 1.0.0
--- Description: Hold Option+/ to record and auto-paste transcription via Groq Whisper
-
 return function(manager)
 	local P = {}
 

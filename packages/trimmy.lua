@@ -1,7 +1,3 @@
--- Trimmy Package
--- Version: 1.0.0
--- Description: Automatically flattens multi-line shell commands in clipboard
-
 return function(manager)
 	local P = {}
 
@@ -226,6 +222,52 @@ return function(manager)
 			autoTrimEnabled = settings.autoTrimEnabled,
 			aggressiveness = settings.aggressiveness,
 			preserveBlankLines = settings.preserveBlankLines,
+		}
+	end
+
+	function P.getMenuItems()
+		return {
+			{
+				title = "Trim Clipboard Now",
+				fn = function()
+					P.trimNow()
+				end,
+			},
+			{
+				title = (settings.autoTrimEnabled and "✓ " or "") .. "Auto-Trim",
+				fn = function()
+					P.toggleAutoTrim()
+				end,
+			},
+			{
+				title = "Aggressiveness",
+				menu = {
+					{
+						title = (settings.aggressiveness == "low" and "✓ " or "") .. "Low (safer)",
+						fn = function()
+							P.setAggressiveness("low")
+						end,
+					},
+					{
+						title = (settings.aggressiveness == "normal" and "✓ " or "") .. "Normal",
+						fn = function()
+							P.setAggressiveness("normal")
+						end,
+					},
+					{
+						title = (settings.aggressiveness == "high" and "✓ " or "") .. "High (more eager)",
+						fn = function()
+							P.setAggressiveness("high")
+						end,
+					},
+				},
+			},
+			{
+				title = (settings.preserveBlankLines and "✓ " or "") .. "Keep blank lines",
+				fn = function()
+					P.togglePreserveBlankLines()
+				end,
+			},
 		}
 	end
 

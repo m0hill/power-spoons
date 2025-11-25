@@ -1,7 +1,3 @@
--- Spotify Lyrics Package
--- Version: 1.0.0
--- Description: Floating synchronized lyrics overlay for Spotify
-
 return function(manager)
 	local P = {}
 
@@ -466,6 +462,17 @@ end if
 			visible = true
 		end
 		return visible
+	end
+
+	function P.getMenuItems()
+		return {
+			{
+				title = (P.isVisible() and "Hide" or "Show") .. " Overlay",
+				fn = function()
+					P.toggleVisibility()
+				end,
+			},
+		}
 	end
 
 	return P

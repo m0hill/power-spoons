@@ -1,7 +1,3 @@
--- Gemini OCR Package
--- Version: 1.0.0
--- Description: Screenshot OCR using Google Gemini. Press Cmd+Shift+S to capture and extract text.
-
 return function(manager)
 	local P = {}
 
