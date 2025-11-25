@@ -87,6 +87,7 @@ return function(manager)
 		overlay:level(hs.canvas.windowLevels.floating)
 		overlay:alpha(0.97)
 		overlay:clickActivating(false)
+		overlay:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
 
 		overlay:appendElements({
 			id = "background",
