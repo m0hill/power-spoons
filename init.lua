@@ -60,7 +60,7 @@ local PowerSpoons = (function()
 			-- json contains error message when ok is false
 			return false, "Failed to encode JSON: " .. tostring(json)
 		end
-		
+
 		if not json then
 			return false, "JSON encode returned nil"
 		end
@@ -165,13 +165,13 @@ local PowerSpoons = (function()
 				if key:sub(1, #prefix) == prefix then
 					local settingKey = key:sub(#prefix + 1)
 					local value = hs.settings.get(key)
-					
+
 					-- Only migrate JSON-safe values
 					if isJsonSafe(value) then
 						pkgSettings[settingKey] = value
 						foundAny = true
 					end
-					
+
 					-- Clear old setting
 					hs.settings.set(key, nil)
 				end
@@ -887,8 +887,6 @@ Repository: github.com/m0hill/power-spoons]],
 				end
 			end)
 		end
-
-
 	end
 
 	return M

@@ -11,6 +11,8 @@ return function(manager)
 		HOTKEY_KEY = "/",
 		ENABLE_NOTIFY = true,
 		ENABLE_SOUND = true,
+		RECORDING_INDICATOR_COLOR = { red = 1, green = 0, blue = 0, alpha = 0.9 },
+		TRANSCRIBING_INDICATOR_COLOR = { red = 0, green = 0.8, blue = 1, alpha = 0.9 },
 	}
 
 	local API_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
@@ -23,18 +25,27 @@ return function(manager)
 	local stop_timer = nil
 	local wav_path = nil
 	local hotkey = nil
+	local recordingIndicator = nil
+	local transcribingIndicator = nil
+	local indicatorTimer = nil
+	local pulseTimer = nil
+	local pulseDirection = 1
+	local pulseAlpha = 0.3
+	local telemetry = nil
 
-	local function notify(title, text)
+	local function notify(title, text, sound)
 		if not CONFIG.ENABLE_NOTIFY then
 			return
 		end
-		hs.notify
-			.new({
-				title = title,
-				informativeText = text or "",
-				withdrawAfter = 3,
-			})
-			:send()
+		local notification = hs.notify.new({
+			title = title,
+			informativeText = text or "",
+			withdrawAfter = 3,
+		})
+		if sound and CONFIG.ENABLE_SOUND then
+			notification:soundName(sound)
+		end
+		notification:send()
 	end
 
 	local function playSound(type)
@@ -80,6 +91,199 @@ return function(manager)
 		return dir .. name
 	end
 
+	local function formatDuration(value)
+		if not value or value <= 0 then
+			return "n/a"
+		end
+		return string.format("%.2fs", value)
+	end
+
+	local function toNumber(value)
+		if type(value) == "number" then
+			return value
+		elseif type(value) == "string" and value ~= "" then
+			local parsed = tonumber(value)
+			if parsed and parsed >= 0 then
+				return parsed
+			end
+		end
+		return nil
+	end
+
+	local function buildTelemetrySummary()
+		if not telemetry then
+			return nil
+		end
+
+		local metrics = telemetry.curlMetrics or {}
+		local parts = {}
+
+		if telemetry.recordingDuration then
+			table.insert(parts, "record " .. formatDuration(telemetry.recordingDuration))
+		end
+
+		local upload = toNumber(metrics.time_upload)
+		if upload and upload > 0 then
+			table.insert(parts, "upload " .. formatDuration(upload))
+		end
+
+		local responseWait = nil
+		local startTransfer = toNumber(metrics.time_starttransfer)
+		local uploadRef = toNumber(metrics.time_upload)
+		if startTransfer and uploadRef then
+			responseWait = startTransfer - uploadRef
+			if responseWait <= 0 then
+				responseWait = nil
+			end
+		end
+		if responseWait then
+			table.insert(parts, "server " .. formatDuration(responseWait))
+		end
+
+		local download = toNumber(metrics.time_download)
+		if download and download > 0 then
+			table.insert(parts, "download " .. formatDuration(download))
+		end
+
+		local total = toNumber(metrics.time_total)
+		if total and total > 0 then
+			table.insert(parts, "api " .. formatDuration(total))
+		end
+
+		if telemetry.transcriptionStartedAt and telemetry.transcriptionFinishedAt and total and total > 0 then
+			local measured = telemetry.transcriptionFinishedAt - telemetry.transcriptionStartedAt
+			if measured and measured > total then
+				local localTime = measured - total
+				if localTime > 0 then
+					table.insert(parts, "local " .. formatDuration(localTime))
+				end
+			end
+		end
+
+		if #parts > 0 then
+			return "⏱ " .. table.concat(parts, " | ")
+		end
+
+		return nil
+	end
+
+	local function createRecordingIndicator()
+		local mousePos = hs.mouse.absolutePosition()
+		recordingIndicator = hs.canvas.new({
+			x = mousePos.x - 15,
+			y = mousePos.y - 35,
+			w = 30,
+			h = 30,
+		})
+
+		recordingIndicator[1] = {
+			type = "circle",
+			action = "stroke",
+			strokeColor = CONFIG.RECORDING_INDICATOR_COLOR,
+			strokeWidth = 2,
+			center = { x = 15, y = 15 },
+			radius = 12,
+		}
+
+		recordingIndicator[2] = {
+			type = "circle",
+			action = "fill",
+			fillColor = CONFIG.RECORDING_INDICATOR_COLOR,
+			center = { x = 15, y = 15 },
+			radius = 8,
+		}
+
+		recordingIndicator:show()
+
+		indicatorTimer = hs.timer.new(0.05, function()
+			if recordingIndicator then
+				local pos = hs.mouse.absolutePosition()
+				recordingIndicator:topLeft({ x = pos.x - 15, y = pos.y - 35 })
+			end
+		end)
+		indicatorTimer:start()
+	end
+
+	local function createTranscribingIndicator()
+		local mousePos = hs.mouse.absolutePosition()
+		transcribingIndicator = hs.canvas.new({
+			x = mousePos.x - 15,
+			y = mousePos.y - 35,
+			w = 30,
+			h = 30,
+		})
+
+		transcribingIndicator[1] = {
+			type = "circle",
+			action = "stroke",
+			strokeColor = { red = 0, green = 0.8, blue = 1, alpha = pulseAlpha },
+			strokeWidth = 3,
+			center = { x = 15, y = 15 },
+			radius = 12,
+		}
+
+		transcribingIndicator[2] = {
+			type = "circle",
+			action = "fill",
+			fillColor = CONFIG.TRANSCRIBING_INDICATOR_COLOR,
+			center = { x = 15, y = 15 },
+			radius = 6,
+		}
+
+		transcribingIndicator:show()
+
+		indicatorTimer = hs.timer.new(0.05, function()
+			if transcribingIndicator then
+				local pos = hs.mouse.absolutePosition()
+				transcribingIndicator:topLeft({ x = pos.x - 15, y = pos.y - 35 })
+			end
+		end)
+		indicatorTimer:start()
+
+		pulseTimer = hs.timer.new(0.03, function()
+			if transcribingIndicator and transcribingIndicator[1] then
+				pulseAlpha = pulseAlpha + (pulseDirection * 0.02)
+				if pulseAlpha >= 0.9 then
+					pulseDirection = -1
+				elseif pulseAlpha <= 0.3 then
+					pulseDirection = 1
+				end
+
+				transcribingIndicator[1] = {
+					type = "circle",
+					action = "stroke",
+					strokeColor = { red = 0, green = 0.8, blue = 1, alpha = pulseAlpha },
+					strokeWidth = 3,
+					center = { x = 15, y = 15 },
+					radius = 12,
+				}
+			end
+		end)
+		pulseTimer:start()
+	end
+
+	local function cleanupIndicators()
+		if indicatorTimer then
+			indicatorTimer:stop()
+			indicatorTimer = nil
+		end
+
+		if pulseTimer then
+			pulseTimer:stop()
+			pulseTimer = nil
+		end
+
+		if recordingIndicator then
+			recordingIndicator:delete()
+			recordingIndicator = nil
+		end
+
+		if transcribingIndicator then
+			transcribingIndicator:delete()
+			transcribingIndicator = nil
+		end
+	end
+
 	local function cleanupRecordingRuntime()
 		if rec_task and rec_task:isRunning() then
 			rec_task:terminate()
@@ -91,13 +295,15 @@ return function(manager)
 			stop_timer = nil
 		end
 
+		cleanupIndicators()
 		is_recording = false
 	end
 
 	local function transcribeAudio(path)
 		local apiKey = manager.getSecret("GROQ_API_KEY")
 		if not apiKey or apiKey == "" then
-			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
+			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.", "Basso")
+			playSound("error")
 			if path then
 				os.remove(path)
 			end
@@ -109,11 +315,18 @@ return function(manager)
 			if path then
 				os.remove(path)
 			end
-			notify("Whisper", "Recording too short. Please speak longer.")
+			notify("Whisper", "Recording too short. Please speak longer.", "Funk")
 			return
 		end
 
 		is_busy = true
+		createTranscribingIndicator()
+
+		if telemetry then
+			telemetry.transcriptionStartedAt = hs.timer.secondsSinceEpoch()
+		else
+			telemetry = { transcriptionStartedAt = hs.timer.secondsSinceEpoch() }
+		end
 
 		local args = {
 			"-sS",
@@ -127,50 +340,85 @@ return function(manager)
 			"model=" .. CONFIG.MODEL,
 			"-F",
 			"response_format=json",
+			"-w",
+			'__CURL_TIMING__{"time_total":"%{time_total}","time_upload":"%{time_upload}","time_starttransfer":"%{time_starttransfer}","time_download":"%{time_download}"}',
 			API_URL,
 		}
 
 		local curl = hs.task.new("/usr/bin/curl", function(exitCode, out, err)
 			is_busy = false
+			cleanupIndicators()
 			if path then
 				os.remove(path)
 			end
 			wav_path = nil
 
+			local metrics = nil
+			if out and out:find("__CURL_TIMING__") then
+				local bodyPart, metricsPart = out:match("^(.*)__CURL_TIMING__(%b{})$")
+				if bodyPart then
+					out = bodyPart
+					local okMetrics, parsed = pcall(hs.json.decode, metricsPart)
+					if okMetrics and type(parsed) == "table" then
+						metrics = parsed
+						if telemetry then
+							telemetry.curlMetrics = parsed
+						end
+					end
+				end
+			end
+
 			out = (out or ""):gsub("%s+$", "")
 
 			if exitCode ~= 0 then
-				notify("Whisper", "Network error while calling API.")
+				notify("Whisper", "Network error while calling API.", "Basso")
 				playSound("error")
+				telemetry = nil
 				return
 			end
 
 			local ok, body = pcall(hs.json.decode, out or "")
 			if not ok or not body then
-				notify("Whisper", "Invalid API response.")
+				notify("Whisper", "Invalid API response.", "Basso")
 				playSound("error")
+				telemetry = nil
 				return
 			end
 
 			if body.error then
 				local msg = body.error.message or "Unknown API error"
-				notify("Whisper", "Transcription error: " .. msg)
+				notify("Whisper", "Transcription error: " .. msg, "Basso")
 				playSound("error")
+				telemetry = nil
 				return
 			end
 
 			local text = (body.text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 			if text == "" then
-				notify("Whisper", "No speech detected in audio.")
+				notify("Whisper", "No speech detected in audio.", "Funk")
+				telemetry = nil
 				return
+			end
+
+			local now = hs.timer.secondsSinceEpoch()
+			if telemetry then
+				telemetry.transcriptionFinishedAt = now
+				if not telemetry.curlMetrics and metrics then
+					telemetry.curlMetrics = metrics
+				end
 			end
 
 			hs.pasteboard.setContents(text)
 			hs.eventtap.keyStroke({ "cmd" }, "v", 0)
 
-			local preview = '"' .. (text:len() > 60 and text:sub(1, 57) .. "..." or text) .. '"'
-			notify("Whisper", "Transcribed: " .. preview)
+			local preview = '"' .. (text:len() > 50 and text:sub(1, 50) .. "..." or text) .. '"'
+			local summary = buildTelemetrySummary()
+			if summary then
+				print("[whisper] " .. summary)
+			end
+			notify("Whisper", preview, "Glass")
 			playSound("success")
+			telemetry = nil
 		end, args)
 
 		curl:start()
@@ -181,6 +429,14 @@ return function(manager)
 			return
 		end
 
+		local now = hs.timer.secondsSinceEpoch()
+		if telemetry then
+			if telemetry.recordingStartedAt then
+				telemetry.recordingDuration = now - telemetry.recordingStartedAt
+			end
+			telemetry.recordingStoppedAt = now
+		end
+
 		cleanupRecordingRuntime()
 		playSound("stop")
 
@@ -189,6 +445,7 @@ return function(manager)
 
 		if not path then
 			notify("Whisper", "No recording captured.")
+			telemetry = nil
 			return
 		end
 
@@ -197,21 +454,23 @@ return function(manager)
 
 	local function startRecording()
 		if is_busy then
-			notify("Whisper", "Currently transcribing. Wait for it to finish.")
+			notify("Whisper", "Currently transcribing. Wait for it to finish.", "Funk")
 			return
 		end
 		if is_recording then
-			notify("Whisper", "Already recording.")
+			notify("Whisper", "Already recording.", "Funk")
 			return
 		end
 
 		if not rec_path then
 			rec_path = which("rec")
 			if not rec_path then
-				notify("Whisper", "'sox' is not installed.\nInstall via: brew install sox")
+				notify("Whisper", "'sox' is not installed.\nInstall via: brew install sox", "Basso")
 				return
 			end
 		end
+
+		telemetry = { recordingStartedAt = hs.timer.secondsSinceEpoch() }
 
 		wav_path = tmpWavPath()
 		is_recording = true
@@ -230,12 +489,14 @@ return function(manager)
 		if not rec_task:start() then
 			is_recording = false
 			wav_path = nil
-			notify("Whisper", "Could not start audio recording.")
+			notify("Whisper", "Could not start audio recording.", "Basso")
 			playSound("error")
+			telemetry = nil
 			return
 		end
 
 		stop_timer = hs.timer.doAfter(CONFIG.MAX_HOLD_SECONDS, stopRecordingAndTranscribe)
+		createRecordingIndicator()
 
 		notify(
 			"Whisper",
@@ -243,7 +504,8 @@ return function(manager)
 				.. table.concat(CONFIG.HOTKEY_MODS, "+")
 				.. "+"
 				.. CONFIG.HOTKEY_KEY
-				.. " to transcribe."
+				.. " to transcribe.",
+			"Glass"
 		)
 		playSound("start")
 	end
@@ -262,11 +524,13 @@ return function(manager)
 			hotkey = nil
 		end
 		cleanupRecordingRuntime()
+		cleanupIndicators()
 		if wav_path then
 			os.remove(wav_path)
 			wav_path = nil
 		end
 		is_busy = false
+		telemetry = nil
 	end
 
 	function P.getStatus()
