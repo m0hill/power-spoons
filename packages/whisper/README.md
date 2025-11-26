@@ -47,7 +47,12 @@ Click **Enable** in the Whisper Transcription submenu.
 
 ## Configuration
 
-The package includes sensible defaults, but you can modify these in the source code:
+Use the Power Spoons menubar → Whisper Transcription submenu to toggle:
+
+- Show notifications
+- Play sounds
+
+For advanced tweaks, edit `packages/whisper/init.lua`:
 
 - `MODEL`: Whisper model variant (default: `whisper-large-v3-turbo`)
 - `SAMPLE_RATE`: Audio quality (default: 16000 Hz)

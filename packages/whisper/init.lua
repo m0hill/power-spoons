@@ -1,5 +1,6 @@
 return function(manager)
 	local P = {}
+	local PACKAGE_ID = "whisper"
 
 	local CONFIG = {
 		MODEL = "whisper-large-v3-turbo",
@@ -32,9 +33,26 @@ return function(manager)
 	local pulseDirection = 1
 	local pulseAlpha = 0.3
 	local telemetry = nil
+	local settings = {
+		enableNotify = manager.getSetting(PACKAGE_ID, "enableNotify", CONFIG.ENABLE_NOTIFY),
+		enableSound = manager.getSetting(PACKAGE_ID, "enableSound", CONFIG.ENABLE_SOUND),
+	}
+
+	local function saveSetting(key, value)
+		settings[key] = value
+		manager.setSetting(PACKAGE_ID, key, value)
+	end
+
+	local function toggleNotifySetting()
+		saveSetting("enableNotify", not settings.enableNotify)
+	end
+
+	local function toggleSoundSetting()
+		saveSetting("enableSound", not settings.enableSound)
+	end
 
 	local function notify(title, text, sound)
-		if not CONFIG.ENABLE_NOTIFY then
+		if not settings.enableNotify then
 			return
 		end
 		local notification = hs.notify.new({
@@ -42,14 +60,14 @@ return function(manager)
 			informativeText = text or "",
 			withdrawAfter = 3,
 		})
-		if sound and CONFIG.ENABLE_SOUND then
+		if sound and settings.enableSound then
 			notification:soundName(sound)
 		end
 		notification:send()
 	end
 
 	local function playSound(type)
-		if not CONFIG.ENABLE_SOUND then
+		if not settings.enableSound then
 			return
 		end
 		local sounds = {
@@ -531,6 +549,23 @@ return function(manager)
 		end
 		is_busy = false
 		telemetry = nil
+	end
+
+	function P.getMenuItems()
+		return {
+			{
+				title = (settings.enableNotify and "✓ " or "") .. "Show notifications",
+				fn = function()
+					toggleNotifySetting()
+				end,
+			},
+			{
+				title = (settings.enableSound and "✓ " or "") .. "Play sounds",
+				fn = function()
+					toggleSoundSetting()
+				end,
+			},
+		}
 	end
 
 	function P.getStatus()
