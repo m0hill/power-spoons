@@ -20,6 +20,15 @@ local PowerSpoons = (function()
 		instances = {}, -- [id] = running package instance
 	}
 
+	local function logError(context, err)
+		local message = string.format("[Power Spoons] %s: %s", context or "Error", err or "unknown error")
+		if hs.printf then
+			hs.printf(message)
+		else
+			print(message)
+		end
+	end
+
 	-- Helpers
 	local function ensureDir(path)
 		local attrs = hs.fs.attributes(path)
@@ -47,7 +56,13 @@ local PowerSpoons = (function()
 		end
 
 		local ok, data = pcall(hs.json.decode, content)
-		if not ok or type(data) ~= "table" then
+		if not ok then
+			logError("JSON decode failed for " .. filePath, data)
+			return defaultValue
+		end
+
+		if type(data) ~= "table" then
+			logError("JSON decode returned non-table for " .. filePath, "Unexpected data type")
 			return defaultValue
 		end
 
@@ -58,15 +73,18 @@ local PowerSpoons = (function()
 		local ok, json = pcall(hs.json.encode, data, true)
 		if not ok then
 			-- json contains error message when ok is false
+			logError("JSON encode failed for " .. filePath, json)
 			return false, "Failed to encode JSON: " .. tostring(json)
 		end
 
 		if not json then
+			logError("JSON encode returned nil for " .. filePath, "No JSON produced")
 			return false, "JSON encode returned nil"
 		end
 
 		local file = io.open(filePath, "w")
 		if not file then
+			logError("File write failed for " .. filePath, "Unable to open file")
 			return false, "Failed to open file for writing"
 		end
 
@@ -127,11 +145,17 @@ local PowerSpoons = (function()
 			lastRefresh = oldData.lastRefresh or 0,
 			packages = oldData.packages or {},
 		}
-		saveState(newState)
+		local savedState, stateErr = saveState(newState)
+		if not savedState then
+			reportError("Migrating legacy state", stateErr, true)
+		end
 
 		-- Migrate secrets
 		if oldData.secrets and type(oldData.secrets) == "table" then
-			saveSecrets(oldData.secrets)
+			local savedSecrets, secretsErr = saveSecrets(oldData.secrets)
+			if not savedSecrets then
+				reportError("Migrating legacy secrets", secretsErr, true)
+			end
 		end
 
 		-- Helper to check if a value is JSON-serializable
@@ -207,6 +231,13 @@ local PowerSpoons = (function()
 			:send()
 	end
 
+	local function reportError(context, err, shouldNotify)
+		logError(context, err)
+		if shouldNotify then
+			notify("Power Spoons", context .. ": " .. tostring(err or "unknown error"))
+		end
+	end
+
 	local function secretMask(value)
 		if not value or value == "" then
 			return "[Not set]"
@@ -230,7 +261,10 @@ local PowerSpoons = (function()
 		else
 			secrets[key] = value
 		end
-		saveSecrets(secrets)
+		local saved, err = saveSecrets(secrets)
+		if not saved then
+			reportError("Saving secret '" .. key .. "'", err, true)
+		end
 	end
 
 	-- Package Settings API
@@ -254,7 +288,11 @@ local PowerSpoons = (function()
 		else
 			settings[key] = value
 		end
-		return writeJsonFile(settingsFile, settings)
+		local ok, err = writeJsonFile(settingsFile, settings)
+		if not ok then
+			reportError("Saving setting '" .. packageId .. "." .. key .. "'", err, true)
+		end
+		return ok, err
 	end
 
 	function M.getSettings(packageId)
@@ -265,7 +303,11 @@ local PowerSpoons = (function()
 	function M.setSettings(packageId, settingsTable)
 		ensurePowerSpoonsDir()
 		local settingsFile = SETTINGS_DIR .. "/" .. packageId .. ".json"
-		return writeJsonFile(settingsFile, settingsTable)
+		local ok, err = writeJsonFile(settingsFile, settingsTable)
+		if not ok then
+			reportError("Saving settings for '" .. packageId .. "'", err, true)
+		end
+		return ok, err
 	end
 
 	local function openSecretPrompt(secretDef)
@@ -298,9 +340,14 @@ local PowerSpoons = (function()
 		local state = loadState()
 		local flags = state.packages[id]
 		if not flags then
-			return { installed = false, enabled = false }
+			return { installed = false, enabled = false, version = nil, lastUpdated = nil }
 		end
-		return flags
+		return {
+			installed = flags.installed == true,
+			enabled = flags.enabled ~= false,
+			version = flags.version,
+			lastUpdated = flags.lastUpdated,
+		}
 	end
 
 	-- Package loading & execution
@@ -331,17 +378,20 @@ local PowerSpoons = (function()
 	local function downloadPackage(packageDef, callback)
 		local url = packageDef.source
 		if not url then
+			reportError("Download package '" .. packageDef.id .. "'", "No source URL specified", true)
 			callback(false, "No source URL specified")
 			return
 		end
 
 		hs.http.asyncGet(url, nil, function(status, body, _)
 			if status ~= 200 then
+				logError("Download package '" .. packageDef.id .. "'", "HTTP " .. tostring(status))
 				callback(false, "HTTP " .. tostring(status))
 				return
 			end
 
 			if not body or body == "" then
+				logError("Download package '" .. packageDef.id .. "'", "Empty response body")
 				callback(false, "Empty response")
 				return
 			end
@@ -353,6 +403,10 @@ local PowerSpoons = (function()
 			if file then
 				file:write(body)
 				file:close()
+			else
+				logError("Download package '" .. packageDef.id .. "'", "Unable to write cache file")
+				callback(false, "Failed to cache package")
+				return
 			end
 
 			callback(true, body)
@@ -372,6 +426,7 @@ local PowerSpoons = (function()
 
 		local def = getPackageDef(id)
 		if not def then
+			logError("Start package '" .. id .. "'", "Not found in manifest")
 			notify("Power Spoons", "Package '" .. id .. "' not found in manifest")
 			return
 		end
@@ -380,6 +435,7 @@ local PowerSpoons = (function()
 		local cachePath = getCacheFilePath(id)
 		local file = io.open(cachePath, "r")
 		if not file then
+			logError("Start package '" .. id .. "'", "Code not cached")
 			notify("Power Spoons", "Package '" .. id .. "' code not cached. Try reinstalling.")
 			return
 		end
@@ -387,12 +443,14 @@ local PowerSpoons = (function()
 		file:close()
 
 		if not code then
+			logError("Start package '" .. id .. "'", "Cached code empty")
 			notify("Power Spoons", "Package '" .. id .. "' code not available")
 			return
 		end
 
 		local instance, err = loadPackageCode(id, code)
 		if not instance then
+			logError("Start package '" .. id .. "'", err)
 			notify("Power Spoons", "Failed to load package '" .. id .. "': " .. tostring(err))
 			return
 		end
@@ -402,6 +460,7 @@ local PowerSpoons = (function()
 		if instance.start then
 			local ok, errStart = pcall(instance.start)
 			if not ok then
+				logError("Start package '" .. id .. "'", errStart)
 				notify("Power Spoons", "Failed to start package '" .. id .. "': " .. tostring(errStart))
 			end
 		end
@@ -413,7 +472,10 @@ local PowerSpoons = (function()
 			return
 		end
 		if instance.stop then
-			pcall(instance.stop)
+			local ok, errStop = pcall(instance.stop)
+			if not ok then
+				logError("Stop package '" .. id .. "'", errStop)
+			end
 		end
 		runtime.instances[id] = nil
 	end
@@ -421,6 +483,7 @@ local PowerSpoons = (function()
 	local function installPackage(id, callback)
 		local def = getPackageDef(id)
 		if not def then
+			reportError("Install package '" .. id .. "'", "Package not found", true)
 			if callback then
 				callback(false, "Package not found")
 			end
@@ -429,7 +492,7 @@ local PowerSpoons = (function()
 
 		downloadPackage(def, function(success, bodyOrErr)
 			if not success then
-				notify("Power Spoons", "Failed to download '" .. id .. "': " .. tostring(bodyOrErr))
+				reportError("Failed to download '" .. id .. "'", bodyOrErr, true)
 				if callback then
 					callback(false, bodyOrErr)
 				end
@@ -438,14 +501,79 @@ local PowerSpoons = (function()
 
 			-- Update persistent state
 			local state = loadState()
-			state.packages[id] = {
-				installed = true,
-				enabled = true,
-			}
-			saveState(state)
+			local pkgState = state.packages[id] or {}
+			pkgState.installed = true
+			if pkgState.enabled == nil then
+				pkgState.enabled = true
+			end
+			pkgState.version = def.version or pkgState.version
+			pkgState.lastUpdated = os.time()
+			state.packages[id] = pkgState
+			local saved, saveErr = saveState(state)
+			if not saved then
+				reportError("Saving state after installing '" .. id .. "'", saveErr, true)
+			end
 
 			startPackage(id)
 			notify("Power Spoons", "Installed: " .. def.name)
+
+			if callback then
+				callback(true)
+			end
+		end)
+	end
+
+	local function updatePackage(id, callback)
+		local def = getPackageDef(id)
+		if not def then
+			reportError("Update package '" .. id .. "'", "Package not found", true)
+			if callback then
+				callback(false, "Package not found")
+			end
+			return
+		end
+
+		local flags = getPackageFlags(id)
+		if not flags.installed then
+			reportError("Update package '" .. id .. "'", "Package is not installed", true)
+			if callback then
+				callback(false, "Package is not installed")
+			end
+			return
+		end
+
+		downloadPackage(def, function(success, bodyOrErr)
+			if not success then
+				reportError("Failed to update '" .. id .. "'", bodyOrErr, true)
+				if callback then
+					callback(false, bodyOrErr)
+				end
+				return
+			end
+
+			local state = loadState()
+			local pkgState = state.packages[id] or {}
+			pkgState.installed = true
+			if pkgState.enabled == nil then
+				pkgState.enabled = true
+			end
+			pkgState.version = def.version or pkgState.version
+			pkgState.lastUpdated = os.time()
+			state.packages[id] = pkgState
+			local saved, saveErr = saveState(state)
+			if not saved then
+				reportError("Saving state after updating '" .. id .. "'", saveErr, true)
+			end
+
+			if runtime.instances[id] then
+				stopPackage(id)
+			end
+
+			if pkgState.enabled then
+				startPackage(id)
+			end
+
+			notify("Power Spoons", string.format("Updated: %s (%s)", def.name, def.version or "new version"))
 
 			if callback then
 				callback(true)
@@ -459,7 +587,10 @@ local PowerSpoons = (function()
 		-- Update persistent state
 		local state = loadState()
 		state.packages[id] = nil
-		saveState(state)
+		local saved, saveErr = saveState(state)
+		if not saved then
+			reportError("Saving state after uninstalling '" .. id .. "'", saveErr, true)
+		end
 
 		-- Delete cached file
 		local cachePath = getCacheFilePath(id)
@@ -492,11 +623,17 @@ local PowerSpoons = (function()
 
 		if state.packages[id].enabled then
 			state.packages[id].enabled = false
-			saveState(state)
+			local saved, saveErr = saveState(state)
+			if not saved then
+				reportError("Disabling package '" .. id .. "'", saveErr, true)
+			end
 			stopPackage(id)
 		else
 			state.packages[id].enabled = true
-			saveState(state)
+			local saved, saveErr = saveState(state)
+			if not saved then
+				reportError("Enabling package '" .. id .. "'", saveErr, true)
+			end
 			startPackage(id)
 		end
 	end
@@ -505,6 +642,7 @@ local PowerSpoons = (function()
 	local function fetchManifest(callback)
 		hs.http.asyncGet(MANIFEST_URL, nil, function(status, body, _)
 			if status ~= 200 then
+				logError("Fetch manifest", "HTTP " .. tostring(status))
 				if callback then
 					callback(false, "HTTP " .. tostring(status))
 				end
@@ -513,6 +651,7 @@ local PowerSpoons = (function()
 
 			local ok, manifest = pcall(hs.json.decode, body)
 			if not ok or type(manifest) ~= "table" then
+				logError("Fetch manifest", "Invalid JSON")
 				if callback then
 					callback(false, "Invalid manifest JSON")
 				end
@@ -523,7 +662,10 @@ local PowerSpoons = (function()
 			local state = loadState()
 			state.manifest = manifest
 			state.lastRefresh = os.time()
-			saveState(state)
+			local saved, saveErr = saveState(state)
+			if not saved then
+				reportError("Saving state after manifest refresh", saveErr, true)
+			end
 
 			if callback then
 				callback(true, manifest)
@@ -538,7 +680,7 @@ local PowerSpoons = (function()
 
 		fetchManifest(function(success, resultOrErr)
 			if not success then
-				notify("Power Spoons", "Failed to refresh: " .. tostring(resultOrErr))
+				reportError("Failed to refresh manifest", resultOrErr, manual)
 				if callback then
 					callback(false)
 				end
@@ -613,6 +755,16 @@ local PowerSpoons = (function()
 						status = " (disabled)"
 					end
 
+					local installedVersion = flags.version or "unknown"
+					local latestVersion = def.version or "unknown"
+					local updateAvailable = flags.installed
+						and def.version
+						and flags.version
+						and def.version ~= flags.version
+					if updateAvailable then
+						status = status .. " – update available"
+					end
+
 					local submenu = {
 						{
 							title = flags.enabled and "Disable" or "Enable",
@@ -623,25 +775,43 @@ local PowerSpoons = (function()
 								end
 							end,
 						},
-						{
-							title = "Uninstall…",
-							fn = function()
-								uninstallPackage(def.id)
-								if runtime.menubar then
-									runtime.menubar:setMenu(buildMenu())
-								end
-							end,
-						},
-						{ title = "-" },
-						{
-							title = def.description or "",
-							disabled = true,
-						},
-						{
-							title = "Version: " .. (def.version or "unknown"),
-							disabled = true,
-						},
 					}
+
+					if updateAvailable then
+						table.insert(submenu, {
+							title = "Update to " .. latestVersion,
+							fn = function()
+								updatePackage(def.id, function()
+									if runtime.menubar then
+										runtime.menubar:setMenu(buildMenu())
+									end
+								end)
+							end,
+						})
+					end
+
+					table.insert(submenu, {
+						title = "Uninstall…",
+						fn = function()
+							uninstallPackage(def.id)
+							if runtime.menubar then
+								runtime.menubar:setMenu(buildMenu())
+							end
+						end,
+					})
+					table.insert(submenu, { title = "-" })
+					table.insert(submenu, {
+						title = def.description or "",
+						disabled = true,
+					})
+					table.insert(submenu, {
+						title = "Installed version: " .. installedVersion,
+						disabled = true,
+					})
+					table.insert(submenu, {
+						title = "Latest version: " .. latestVersion,
+						disabled = true,
+					})
 
 					-- Add README link if available
 					if def.readme then
