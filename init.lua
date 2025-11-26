@@ -57,7 +57,12 @@ local PowerSpoons = (function()
 	local function writeJsonFile(filePath, data)
 		local ok, json = pcall(hs.json.encode, data, true)
 		if not ok then
-			return false, "Failed to encode JSON"
+			-- json contains error message when ok is false
+			return false, "Failed to encode JSON: " .. tostring(json)
+		end
+		
+		if not json then
+			return false, "JSON encode returned nil"
 		end
 
 		local file = io.open(filePath, "w")
@@ -115,8 +120,6 @@ local PowerSpoons = (function()
 			return false
 		end
 
-		print("[Power Spoons] Migrating from hs.settings to file-based storage...")
-
 		-- Migrate state
 		local newState = {
 			version = oldData.version or 1,
@@ -129,6 +132,23 @@ local PowerSpoons = (function()
 		-- Migrate secrets
 		if oldData.secrets and type(oldData.secrets) == "table" then
 			saveSecrets(oldData.secrets)
+		end
+
+		-- Helper to check if a value is JSON-serializable
+		local function isJsonSafe(val)
+			if val == nil then
+				return true
+			end
+			local t = type(val)
+			if t == "string" or t == "number" or t == "boolean" then
+				return true
+			end
+			if t == "table" then
+				-- Try encoding to check if safe
+				local ok, _ = pcall(hs.json.encode, val)
+				return ok
+			end
+			return false
 		end
 
 		-- Migrate package settings
@@ -144,8 +164,14 @@ local PowerSpoons = (function()
 			for _, key in ipairs(allKeys) do
 				if key:sub(1, #prefix) == prefix then
 					local settingKey = key:sub(#prefix + 1)
-					pkgSettings[settingKey] = hs.settings.get(key)
-					foundAny = true
+					local value = hs.settings.get(key)
+					
+					-- Only migrate JSON-safe values
+					if isJsonSafe(value) then
+						pkgSettings[settingKey] = value
+						foundAny = true
+					end
+					
 					-- Clear old setting
 					hs.settings.set(key, nil)
 				end
@@ -153,14 +179,12 @@ local PowerSpoons = (function()
 
 			if foundAny then
 				M.setSettings(pkgId, pkgSettings)
-				print("[Power Spoons] Migrated settings for package: " .. pkgId)
 			end
 		end
 
 		-- Clear old settings
 		hs.settings.set(OLD_SETTINGS_KEY, nil)
 
-		print("[Power Spoons] Migration complete!")
 		return true
 	end
 
@@ -864,7 +888,7 @@ Repository: github.com/m0hill/power-spoons]],
 			end)
 		end
 
-		print("[Power Spoons] Initialized. Config at ~/.hammerspoon/powerspoons/")
+
 	end
 
 	return M
