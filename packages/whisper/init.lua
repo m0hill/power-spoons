@@ -41,6 +41,7 @@ return function(manager)
 	local pulseDirection = 1
 	local pulseAlpha = 0.3
 	local telemetry = nil
+	local stop_requested = false
 	local settings = {
 		enableNotify = manager.getSetting(PACKAGE_ID, "enableNotify", CONFIG.ENABLE_NOTIFY),
 		enableSound = manager.getSetting(PACKAGE_ID, "enableSound", CONFIG.ENABLE_SOUND),
@@ -311,6 +312,22 @@ return function(manager)
 
 		cleanupIndicators()
 		is_recording = false
+		stop_requested = false
+	end
+
+	local function markRecordingStopped()
+		if not telemetry then
+			return
+		end
+		if telemetry.recordingStoppedAt then
+			return
+		end
+
+		local now = hs.timer.secondsSinceEpoch()
+		telemetry.recordingStoppedAt = now
+		if telemetry.recordingStartedAt then
+			telemetry.recordingDuration = now - telemetry.recordingStartedAt
+		end
 	end
 
 	local function transcribeAudio(path)
@@ -442,13 +459,7 @@ return function(manager)
 			return
 		end
 
-		local now = hs.timer.secondsSinceEpoch()
-		if telemetry then
-			if telemetry.recordingStartedAt then
-				telemetry.recordingDuration = now - telemetry.recordingStartedAt
-			end
-			telemetry.recordingStoppedAt = now
-		end
+		markRecordingStopped()
 
 		cleanupRecordingRuntime()
 
@@ -462,6 +473,32 @@ return function(manager)
 		end
 
 		transcribeAudio(path)
+	end
+
+	local function requestStopRecording()
+		if not is_recording then
+			return
+		end
+		if stop_requested then
+			return
+		end
+
+		stop_requested = true
+		markRecordingStopped()
+
+		if stop_timer then
+			stop_timer:stop()
+			stop_timer = nil
+		end
+
+		-- Ask the recorder to terminate; actual cleanup and transcription
+		-- happen from the hs.task callback once the WAV file is fully written.
+		if rec_task and rec_task:isRunning() then
+			rec_task:terminate()
+		else
+			-- Recorder already finished (or failed); finalize immediately.
+			stopRecordingAndTranscribe()
+		end
 	end
 
 	local function startRecording()
@@ -482,6 +519,7 @@ return function(manager)
 		end
 
 		telemetry = { recordingStartedAt = hs.timer.secondsSinceEpoch() }
+		stop_requested = false
 
 		wav_path = tmpWavPath()
 		is_recording = true
@@ -506,7 +544,7 @@ return function(manager)
 			return
 		end
 
-		stop_timer = hs.timer.doAfter(CONFIG.MAX_HOLD_SECONDS, stopRecordingAndTranscribe)
+		stop_timer = hs.timer.doAfter(CONFIG.MAX_HOLD_SECONDS, requestStopRecording)
 		createRecordingIndicator()
 	end
 
@@ -516,7 +554,7 @@ return function(manager)
 	function P.getHotkeySpec()
 		return {
 			record = {
-				fn = { press = startRecording, release = stopRecordingAndTranscribe },
+				fn = { press = startRecording, release = requestStopRecording },
 				description = "Hold to Record",
 			},
 		}
