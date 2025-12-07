@@ -69,19 +69,6 @@
         "apps": ["Spotify"],
         "note": "Requires Spotify app to be installed"
       }
-    },
-    {
-      "id": "trimmy",
-      "name": "Trimmy",
-      "description": "Flattens multi-line shell commands.",
-      "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/trimmy/README.md",
-      "version": "1.0.0",
-      "author": "m0hill",
-      "defaultEnabled": false,
-      "hotkey": null,
-      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/trimmy/init.lua",
-      "secrets": [],
-      "dependencies": {}
     }
   ]
 }

@@ -57,17 +57,6 @@ Floating synchronized lyrics overlay for Spotify.
 
 ---
 
-### Trimmy
-Automatically flatten multi-line shell commands in clipboard.
-
-- **Auto-detect**: Recognizes shell commands automatically
-- **Smart parsing**: Handles backslashes, pipes, flags
-- **Configurable**: Low/Normal/High aggressiveness levels
-- **Manual override**: Force-trim via menubar
-- **No dependencies**: Pure Hammerspoon implementation
-
----
-
 ## Installation
 
 ### Quick Start (Works for Everyone)
@@ -132,7 +121,6 @@ powerspoons/
 ├── secrets.json        # API keys (gitignore this!)
 ├── settings/           # Per-package settings
 │   ├── lyrics.json
-│   ├── trimmy.json
 │   └── ...
 └── cache/              # Downloaded package code
 ```
@@ -156,12 +144,6 @@ Each package has its own settings accessible from its submenu:
 - Starts automatically when installed
 - Toggle "Hide Overlay" / "Show Overlay" from package menu
 - Drag the overlay to reposition it (position is saved)
-
-**Trimmy:**
-- "Auto-Trim" toggle enables/disables automatic clipboard monitoring
-- "Trim Clipboard Now" forces a trim operation
-- Adjust "Aggressiveness" (Low/Normal/High)
-- Toggle "Keep blank lines" to preserve blank lines when trimming
 
 ---
 
@@ -253,25 +235,25 @@ Want to add a new package? It's easy!
 
 return function(manager)
     local P = {}
-    
+
     -- Called when package is enabled
     function P.start()
         -- Set up hotkeys, timers, watchers, etc.
-        
+
         -- Get API keys from manager
         local apiKey = manager.getSecret("MY_API_KEY")
     end
-    
+
     -- Called when package is disabled or Hammerspoon reloads
     function P.stop()
         -- Clean up resources
     end
-    
+
     -- Optional: show status in menu
     function P.getStatus()
         return "Ready"
     end
-    
+
     return P
 end
 ```
@@ -352,8 +334,7 @@ See [AGENTS.md](AGENTS.md) for detailed guidelines:
 └── powerspoons_cache/                # Downloaded packages
     ├── whisper.lua
     ├── gemini.lua
-    ├── lyrics.lua
-    └── trimmy.lua
+    └── lyrics.lua
 ```
 
 Settings are stored via `hs.settings` under the key `powerspoons.state` (not in files).
@@ -407,7 +388,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Credits
 
-- **Trimmy** spoon inspired by [@steipete](https://github.com/steipete)'s [native Trimmy app](https://github.com/steipete/Trimmy)
 - **Hammerspoon** - [www.hammerspoon.org](https://www.hammerspoon.org/)
 - **Groq** - Lightning-fast Whisper API
 - **Google Gemini** - Powerful multimodal AI

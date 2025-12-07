@@ -13,7 +13,6 @@ power-spoons/
     │   └── README.md     # Package docs
     ├── gemini/
     ├── lyrics/
-    └── trimmy/
 ```
 
 **User Runtime Structure:**
@@ -24,7 +23,6 @@ powerspoons/
 ├── secrets.json          # API keys (gitignored)
 ├── settings/             # Per-package settings
 │   ├── lyrics.json
-│   ├── trimmy.json
 │   └── ...
 └── cache/                # Downloaded package code
     ├── whisper.lua
@@ -69,7 +67,7 @@ Packages can include docstrings at the top of init.lua for documentation:
 - `SCREAMING_SNAKE_CASE` for constants and config tables (e.g., `CONFIG`, `MODELS`, `LANGUAGES`)
 - `camelCase` for local functions (e.g., `createIndicator`, `updateMenuBar`, `formatTime`)
 - `snake_case` for module-level state variables (e.g., `currentTrackId`, `pollTimer`, `menubar`)
-- Prefix private settings keys with module name (e.g., `"lyrics.overlay.frame"`, `"trimmy.aggressiveness"`)
+- Prefix private settings keys with module name (e.g., `"lyrics.overlay.frame"`, `"whisper.aggressiveness"`)
 
 ### Imports & Dependencies
 - Packages are loaded dynamically from GitHub via manifest

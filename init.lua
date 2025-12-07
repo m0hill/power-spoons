@@ -176,8 +176,8 @@ local PowerSpoons = (function()
 		end
 
 		-- Migrate package settings
-		-- Known package prefixes: lyrics., trimmy., whisper., gemini.
-		local packagePrefixes = { "lyrics", "trimmy", "whisper", "gemini" }
+		-- Known package prefixes: lyrics., whisper., gemini.
+		local packagePrefixes = { "lyrics", "whisper", "gemini" }
 		for _, pkgId in ipairs(packagePrefixes) do
 			local prefix = pkgId .. "."
 			local pkgSettings = {}
