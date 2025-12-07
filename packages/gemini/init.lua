@@ -1,6 +1,8 @@
 return function(manager)
 	local P = {}
 
+	local PACKAGE_ID = "gemini"
+
 	local CONFIG = {
 		HOTKEY_MODS = { "cmd", "shift" },
 		HOTKEY_KEY = "s",
@@ -15,8 +17,11 @@ return function(manager)
 			"Put your entire answer inside a code block using three backticks (```).",
 		}, " "),
 		SCREENSHOT_TIMEOUT = 60,
-		ENABLE_NOTIFY = true,
-		ENABLE_SOUND = true,
+	}
+
+	local settings = {
+		enableNotify = manager.getSetting(PACKAGE_ID, "enableNotify", true),
+		enableSound = manager.getSetting(PACKAGE_ID, "enableSound", true),
 	}
 
 	local state = {
@@ -26,27 +31,23 @@ return function(manager)
 		hotkey = nil,
 	}
 
-	local function playSound(type)
-		if not CONFIG.ENABLE_SOUND then
+	local function saveSetting(key, value)
+		settings[key] = value
+		manager.setSetting(PACKAGE_ID, key, value)
+	end
+
+	local function playSound(soundType)
+		if not settings.enableSound then
 			return
 		end
-		local sounds = {
-			capture = "Tink",
-			process = "Purr",
-			success = "Glass",
-			error = "Basso",
-			cancel = "Funk",
-		}
-		if sounds[type] then
-			hs.sound.getByName(sounds[type]):play()
-		end
+		manager.playSound(soundType)
 	end
 
 	local function notify(title, text)
-		if not CONFIG.ENABLE_NOTIFY then
+		if not settings.enableNotify then
 			return
 		end
-		hs.notify.new({ title = title, informativeText = text or "", withdrawAfter = 4 }):send()
+		manager.notify(title, text, { withdrawAfter = 4 })
 	end
 
 	local function cleanUp(path)
@@ -98,8 +99,6 @@ return function(manager)
 		local attrs = hs.fs.attributes(path)
 		if not attrs or attrs.size == 0 then
 			reset(path)
-			notify("Gemini OCR", "No screenshot captured")
-			playSound("cancel")
 			return
 		end
 
@@ -149,8 +148,6 @@ return function(manager)
 
 		local apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" .. CONFIG.MODEL .. ":generateContent"
 
-		playSound("process")
-
 		hs.http.asyncPost(apiUrl, body, headers, function(status, responseData, responseHeaders)
 			local resultText = nil
 			if status == 200 and type(responseData) == "string" then
@@ -177,14 +174,12 @@ return function(manager)
 			end
 
 			notify("Gemini OCR", preview)
-			playSound("success")
 			reset(path)
 		end)
 	end
 
 	local function startCapture()
 		if state.busy then
-			notify("Gemini OCR", "Please wait for the previous request")
 			return
 		end
 
@@ -203,8 +198,6 @@ return function(manager)
 		state.captureTask = hs.task.new("/usr/sbin/screencapture", function(exitCode)
 			if exitCode ~= 0 then
 				reset(tmpPath)
-				notify("Gemini OCR", "Capture cancelled")
-				playSound("cancel")
 				return
 			end
 
@@ -213,7 +206,6 @@ return function(manager)
 				state.timer = nil
 			end
 
-			playSound("capture")
 			postToGemini(tmpPath)
 		end, { "-i", "-o", "-x", "-t", "png", tmpPath })
 
@@ -251,6 +243,23 @@ return function(manager)
 
 	function P.getStatus()
 		return state.busy and "Processing…" or "Ready"
+	end
+
+	function P.getMenuItems()
+		return {
+			{
+				title = (settings.enableNotify and "✓ " or "") .. "Show notifications",
+				fn = function()
+					saveSetting("enableNotify", not settings.enableNotify)
+				end,
+			},
+			{
+				title = (settings.enableSound and "✓ " or "") .. "Play sounds",
+				fn = function()
+					saveSetting("enableSound", not settings.enableSound)
+				end,
+			},
+		}
 	end
 
 	return P

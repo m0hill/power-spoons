@@ -155,13 +155,7 @@ return function(manager)
 		lastChangeCount = hs.pasteboard.changeCount()
 
 		if force then
-			hs.notify
-				.new({
-					title = "Trimmy",
-					informativeText = "Clipboard trimmed",
-					withdrawAfter = 2,
-				})
-				:send()
+			manager.notify("Trimmy", "Clipboard trimmed", { withdrawAfter = 2 })
 		end
 
 		return true

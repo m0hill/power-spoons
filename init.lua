@@ -147,14 +147,14 @@ local PowerSpoons = (function()
 		}
 		local savedState, stateErr = saveState(newState)
 		if not savedState then
-			reportError("Migrating legacy state", stateErr, true)
+			logError("Migrating legacy state", stateErr)
 		end
 
 		-- Migrate secrets
 		if oldData.secrets and type(oldData.secrets) == "table" then
 			local savedSecrets, secretsErr = saveSecrets(oldData.secrets)
 			if not savedSecrets then
-				reportError("Migrating legacy secrets", secretsErr, true)
+				logError("Migrating legacy secrets", secretsErr)
 			end
 		end
 
@@ -221,6 +221,20 @@ local PowerSpoons = (function()
 		return CACHE_DIR .. "/" .. packageId .. ".lua"
 	end
 
+	-- Universal sound effects map
+	local SOUNDS = {
+		success = "Glass",
+		error = "Basso",
+		warning = "Funk",
+		start = "Ping",
+		stop = "Purr",
+		info = "Tink",
+		capture = "Tink",
+		process = "Purr",
+		cancel = "Funk",
+	}
+
+	-- Internal notify for manager use
 	local function notify(title, text)
 		hs.notify
 			.new({
@@ -235,6 +249,44 @@ local PowerSpoons = (function()
 		logError(context, err)
 		if shouldNotify then
 			notify("Power Spoons", context .. ": " .. tostring(err or "unknown error"))
+		end
+	end
+
+	-- Universal Notification API for packages
+	-- options: { withdrawAfter = number, sound = string, soundEnabled = bool }
+	function M.notify(title, text, options)
+		options = options or {}
+		local notification = hs.notify.new({
+			title = title,
+			informativeText = text or "",
+			withdrawAfter = options.withdrawAfter or 3,
+		})
+		if options.sound and options.soundEnabled ~= false then
+			notification:soundName(options.sound)
+		end
+		notification:send()
+	end
+
+	-- Universal Sound API for packages
+	-- type: "success", "error", "warning", "start", "stop", "info", "capture", "process", "cancel"
+	function M.playSound(soundType)
+		local soundName = SOUNDS[soundType]
+		if soundName then
+			local sound = hs.sound.getByName(soundName)
+			if sound then
+				sound:play()
+			end
+		end
+	end
+
+	-- Universal Logging API for packages
+	function M.log(packageId, message)
+		local prefix = packageId and ("[Power Spoons:" .. packageId .. "]") or "[Power Spoons]"
+		local fullMessage = string.format("%s %s", prefix, message or "")
+		if hs.printf then
+			hs.printf(fullMessage)
+		else
+			print(fullMessage)
 		end
 	end
 
@@ -990,7 +1042,7 @@ local PowerSpoons = (function()
 				local stateAbout = loadState()
 				local lastRefreshStr = "Never"
 				if stateAbout.lastRefresh > 0 then
-					lastRefreshStr = os.date("%Y-%m-%d %H:%M", stateAbout.lastRefresh)
+					lastRefreshStr = tostring(os.date("%Y-%m-%d %H:%M", stateAbout.lastRefresh))
 				end
 
 				hs.dialog.blockAlert(

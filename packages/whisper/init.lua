@@ -55,30 +55,18 @@ return function(manager)
 		if not settings.enableNotify then
 			return
 		end
-		local notification = hs.notify.new({
-			title = title,
-			informativeText = text or "",
-			withdrawAfter = 3,
-		})
-		if sound and settings.enableSound then
-			notification:soundName(sound)
-		end
-		notification:send()
+		manager.notify(title, text, { sound = sound, soundEnabled = settings.enableSound })
 	end
 
-	local function playSound(type)
+	local function playSound(soundType)
 		if not settings.enableSound then
 			return
 		end
-		local sounds = {
-			start = "Ping",
-			stop = "Purr",
-			error = "Basso",
-			success = "Glass",
-		}
-		if sounds[type] then
-			hs.sound.getByName(sounds[type]):play()
-		end
+		manager.playSound(soundType)
+	end
+
+	local function log(message)
+		manager.log(PACKAGE_ID, message)
 	end
 
 	local function which(cmd)
@@ -320,7 +308,7 @@ return function(manager)
 	local function transcribeAudio(path)
 		local apiKey = manager.getSecret("GROQ_API_KEY")
 		if not apiKey or apiKey == "" then
-			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.", "Basso")
+			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
 			playSound("error")
 			if path then
 				os.remove(path)
@@ -333,7 +321,7 @@ return function(manager)
 			if path then
 				os.remove(path)
 			end
-			notify("Whisper", "Recording too short. Please speak longer.", "Funk")
+			notify("Whisper", "Recording too short. Please speak longer.")
 			return
 		end
 
@@ -389,7 +377,7 @@ return function(manager)
 			out = (out or ""):gsub("%s+$", "")
 
 			if exitCode ~= 0 then
-				notify("Whisper", "Network error while calling API.", "Basso")
+				notify("Whisper", "Network error while calling API.")
 				playSound("error")
 				telemetry = nil
 				return
@@ -397,7 +385,7 @@ return function(manager)
 
 			local ok, body = pcall(hs.json.decode, out or "")
 			if not ok or not body then
-				notify("Whisper", "Invalid API response.", "Basso")
+				notify("Whisper", "Invalid API response.")
 				playSound("error")
 				telemetry = nil
 				return
@@ -405,7 +393,7 @@ return function(manager)
 
 			if body.error then
 				local msg = body.error.message or "Unknown API error"
-				notify("Whisper", "Transcription error: " .. msg, "Basso")
+				notify("Whisper", "Transcription error: " .. msg)
 				playSound("error")
 				telemetry = nil
 				return
@@ -413,7 +401,7 @@ return function(manager)
 
 			local text = (body.text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 			if text == "" then
-				notify("Whisper", "No speech detected in audio.", "Funk")
+				notify("Whisper", "No speech detected in audio.")
 				telemetry = nil
 				return
 			end
@@ -432,10 +420,9 @@ return function(manager)
 			local preview = '"' .. (text:len() > 50 and text:sub(1, 50) .. "..." or text) .. '"'
 			local summary = buildTelemetrySummary()
 			if summary then
-				print("[whisper] " .. summary)
+				log(summary)
 			end
-			notify("Whisper", preview, "Glass")
-			playSound("success")
+			notify("Whisper", preview)
 			telemetry = nil
 		end, args)
 
@@ -456,7 +443,6 @@ return function(manager)
 		end
 
 		cleanupRecordingRuntime()
-		playSound("stop")
 
 		local path = wav_path
 		wav_path = nil
@@ -472,18 +458,17 @@ return function(manager)
 
 	local function startRecording()
 		if is_busy then
-			notify("Whisper", "Currently transcribing. Wait for it to finish.", "Funk")
 			return
 		end
 		if is_recording then
-			notify("Whisper", "Already recording.", "Funk")
 			return
 		end
 
 		if not rec_path then
 			rec_path = which("rec")
 			if not rec_path then
-				notify("Whisper", "'sox' is not installed.\nInstall via: brew install sox", "Basso")
+				notify("Whisper", "'sox' is not installed.\nInstall via: brew install sox")
+				playSound("error")
 				return
 			end
 		end
@@ -507,7 +492,7 @@ return function(manager)
 		if not rec_task:start() then
 			is_recording = false
 			wav_path = nil
-			notify("Whisper", "Could not start audio recording.", "Basso")
+			notify("Whisper", "Could not start audio recording.")
 			playSound("error")
 			telemetry = nil
 			return
@@ -515,17 +500,6 @@ return function(manager)
 
 		stop_timer = hs.timer.doAfter(CONFIG.MAX_HOLD_SECONDS, stopRecordingAndTranscribe)
 		createRecordingIndicator()
-
-		notify(
-			"Whisper",
-			"Recording… release "
-				.. table.concat(CONFIG.HOTKEY_MODS, "+")
-				.. "+"
-				.. CONFIG.HOTKEY_KEY
-				.. " to transcribe.",
-			"Glass"
-		)
-		playSound("start")
 	end
 
 	function P.start()

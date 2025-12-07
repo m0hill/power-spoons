@@ -152,7 +152,13 @@ return function(manager)
 							end
 						elseif event:getType() == hs.eventtap.event.types.leftMouseUp then
 							if dragContext then
-								manager.setSetting(PACKAGE_ID, "overlay.frame", canvas:frame())
+								local f = canvas:frame()
+								manager.setSetting(PACKAGE_ID, "overlay.frame", {
+									x = f.x,
+									y = f.y,
+									w = f.w,
+									h = f.h,
+								})
 								dragContext = nil
 							end
 							if dragEventTap then
