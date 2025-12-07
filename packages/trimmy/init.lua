@@ -1,3 +1,10 @@
+--- Trimmy Package
+--- Smart clipboard text cleaner that automatically detects and trims command-line text.
+---
+--- @package trimmy
+--- @version 1.0.0
+--- @author m0hill
+
 return function(manager)
 	local P = {}
 

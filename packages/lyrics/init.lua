@@ -1,3 +1,10 @@
+--- Lyrics Overlay Package
+--- Real-time synchronized lyrics display for Spotify with draggable overlay.
+---
+--- @package lyrics
+--- @version 1.0.0
+--- @author m0hill
+
 return function(manager)
 	local P = {}
 
