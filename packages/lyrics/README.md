@@ -15,6 +15,7 @@ A beautiful, draggable lyrics overlay that automatically syncs with whatever you
 - **Smooth scrolling**: Lyrics smoothly scroll as the song plays
 - **Click-through mode**: Optional pass-through mode for working while viewing
 - **Manual refresh**: Re-fetch lyrics if needed
+- **Auto-hide when paused**: Overlay hides when playback is paused or stopped
 
 ## Setup
 
@@ -38,6 +39,7 @@ The lyrics overlay appears automatically when:
 **From the menu:**
 - **Show/Hide Lyrics**: Toggle overlay visibility
 - **Refresh Lyrics**: Re-fetch lyrics for the current track
+- **Size controls**: Increase/decrease overlay scale or reset to defaults
 
 **From the overlay:**
 - **Drag**: Click and drag anywhere on the overlay to move it
@@ -61,12 +63,14 @@ The package uses the LRC (lyrics) format with timestamps:
 
 ## Configuration
 
-The overlay is customizable via the source code:
+You can tweak a few settings by editing `~/.hammerspoon/powerspoons/settings/lyrics.json` (created after first run):
 
-- `POLL_INTERVAL`: How often to check Spotify (default: 0.5 seconds)
-- Overlay colors, fonts, and sizes
-- Number of lyrics lines shown (default: 5)
-- Opacity and background blur
+- `overlay.visible` (boolean): Whether the overlay is allowed to show (default: true)
+- `overlay.scale` (number): Multiplier applied to the overlay canvas and default text sizes (default: 1.0)
+- `overlay.textSizes` (object): Override text sizes individually, e.g. `{ "info": 14, "current": 28, "next": 18 }`
+- `overlay.frame` (object): Persisted position/size when you drag the overlay
+
+Other developer-tunable options live in the source code, like `POLL_INTERVAL` (Spotify poll frequency) and colors.
 
 ## Limitations
 

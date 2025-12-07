@@ -11,6 +11,7 @@ return function(manager)
 	local PACKAGE_ID = "lyrics"
 	local POLL_INTERVAL = 0.5
 	local API_ENDPOINT = "https://lrclib.net/api/get"
+	local DEFAULT_TEXT_SIZES = { info = 15, current = 26, next = 18 }
 
 	local pollTimer = nil
 	local overlay = nil
@@ -20,6 +21,8 @@ return function(manager)
 	local fetchToken = 0
 	local dragContext = nil
 	local dragEventTap = nil
+	local text_size_state = nil
+	local ensureOverlay
 
 	local function formatTime(seconds)
 		if not seconds or seconds < 0 then
@@ -29,6 +32,114 @@ return function(manager)
 		local minutes = math.floor(rounded / 60)
 		local secs = rounded % 60
 		return string.format("%d:%02d", minutes, secs)
+	end
+
+	local function getOverlayScale()
+		local scale = manager.getSetting(PACKAGE_ID, "overlay.scale", 1.0)
+		if type(scale) ~= "number" or scale <= 0 then
+			return 1.0
+		end
+		return math.min(scale, 4.0)
+	end
+
+	local function getTextSizes()
+		local scale = getOverlayScale()
+		local stored = manager.getSetting(PACKAGE_ID, "overlay.textSizes")
+		local result = {}
+
+		for key, defaultSize in pairs(DEFAULT_TEXT_SIZES) do
+			local size = defaultSize
+			if type(stored) == "table" and type(stored[key]) == "number" and stored[key] > 0 then
+				size = stored[key]
+			end
+			result[key] = math.max(8, math.floor(size * scale + 0.5))
+		end
+
+		return result
+	end
+
+	local function applyTextSizes(canvas)
+		local sizes = getTextSizes()
+		if
+			text_size_state
+			and text_size_state.info == sizes.info
+			and text_size_state.current == sizes.current
+			and text_size_state.next == sizes.next
+		then
+			return
+		end
+
+		canvas["info"].textSize = sizes.info
+		canvas["current"].textSize = sizes.current
+		canvas["next"].textSize = sizes.next
+		text_size_state = sizes
+	end
+
+	local function resizeOverlayForScale()
+		if not overlay then
+			return
+		end
+
+		local screen = hs.screen.mainScreen():frame()
+		local scale = getOverlayScale()
+		local width = math.min(math.floor(600 * scale), math.floor(screen.w * 0.8))
+		local height = math.min(math.floor(170 * scale), math.floor(screen.h * 0.6))
+		width = math.max(width, 260)
+		height = math.max(height, 120)
+
+		local frame = overlay:frame()
+		local center = { x = frame.x + frame.w / 2, y = frame.y + frame.h / 2 }
+		local newFrame = {
+			x = center.x - width / 2,
+			y = center.y - height / 2,
+			w = width,
+			h = height,
+		}
+
+		overlay:frame(newFrame)
+		manager.setSetting(PACKAGE_ID, "overlay.frame", newFrame)
+		applyTextSizes(overlay)
+	end
+
+	local function setOverlayScale(newScale)
+		local clamped = math.max(0.6, math.min(4.0, newScale))
+		manager.setSetting(PACKAGE_ID, "overlay.scale", clamped)
+		resizeOverlayForScale()
+	end
+
+	local function bumpOverlayScale(delta)
+		local current = getOverlayScale()
+		setOverlayScale(current + delta)
+	end
+
+	local function resetOverlaySizes()
+		manager.setSetting(PACKAGE_ID, "overlay.scale", 1.0)
+		manager.setSetting(PACKAGE_ID, "overlay.textSizes", nil)
+		text_size_state = nil
+		resizeOverlayForScale()
+	end
+
+	local function shouldDisplayOverlay(state)
+		if not manager.getSetting(PACKAGE_ID, "overlay.visible", true) then
+			return false
+		end
+		if not state or state.playerState ~= "playing" then
+			return false
+		end
+		return true
+	end
+
+	local function syncOverlayVisibility(shouldShow)
+		if shouldShow then
+			if not overlay then
+				ensureOverlay()
+			end
+			if overlay then
+				overlay:show()
+			end
+		elseif overlay then
+			overlay:hide()
+		end
 	end
 
 	local function parseSyncedLyrics(raw)
@@ -67,7 +178,8 @@ return function(manager)
 		return entries
 	end
 
-	local function ensureOverlay()
+	-- Forward-declared to avoid nil upvalue inside helpers.
+	ensureOverlay = function()
 		if overlay then
 			return overlay
 		end
@@ -75,8 +187,11 @@ return function(manager)
 		local frame = manager.getSetting(PACKAGE_ID, "overlay.frame")
 		if not frame then
 			local screen = hs.screen.mainScreen():frame()
-			local width = math.min(600, math.floor(screen.w * 0.45))
-			local height = 170
+			local scale = getOverlayScale()
+			local width = math.min(math.floor(600 * scale), math.floor(screen.w * 0.8))
+			local height = math.min(math.floor(170 * scale), math.floor(screen.h * 0.6))
+			width = math.max(width, 260)
+			height = math.max(height, 120)
 			frame = {
 				x = screen.x + (screen.w - width) / 2,
 				y = screen.y + screen.h - height - 120,
@@ -106,7 +221,7 @@ return function(manager)
 			textAlignment = "center",
 			textColor = { white = 0.85 },
 			textFont = "Helvetica Neue",
-			textSize = 15,
+			textSize = DEFAULT_TEXT_SIZES.info,
 			textLineBreak = "truncateTail",
 		}, {
 			id = "current",
@@ -116,7 +231,7 @@ return function(manager)
 			textAlignment = "center",
 			textColor = { white = 1 },
 			textFont = "Helvetica Neue Bold",
-			textSize = 26,
+			textSize = DEFAULT_TEXT_SIZES.current,
 			textLineBreak = "wordWrap",
 		}, {
 			id = "next",
@@ -126,7 +241,7 @@ return function(manager)
 			textAlignment = "center",
 			textColor = { white = 0.7 },
 			textFont = "Helvetica Neue",
-			textSize = 18,
+			textSize = DEFAULT_TEXT_SIZES.next,
 			textLineBreak = "truncateTail",
 		})
 
@@ -184,15 +299,19 @@ return function(manager)
 		if visible then
 			overlay:show()
 		end
+		applyTextSizes(overlay)
 
 		return overlay
 	end
 
 	local function updateOverlayTexts(infoText, mainText, secondaryText)
-		local canvas = ensureOverlay()
-		canvas["info"].text = infoText or ""
-		canvas["current"].text = mainText or ""
-		canvas["next"].text = secondaryText or ""
+		if not overlay then
+			return
+		end
+		applyTextSizes(overlay)
+		overlay["info"].text = infoText or ""
+		overlay["current"].text = mainText or ""
+		overlay["next"].text = secondaryText or ""
 	end
 
 	local function getSpotifyState()
@@ -282,27 +401,19 @@ end if
 	end
 
 	local function render(state)
-		if not state then
-			updateOverlayTexts("Spotify", "Waiting for playback data…", "")
-			return
-		end
-
-		if state.playerState == "not_running" then
+		if state and (state.playerState == "not_running" or state.playerState == "stopped") then
 			lyricsState = nil
 			currentTrackId = nil
-			updateOverlayTexts("Spotify", "Spotify is not running", "")
+		end
+
+		local displayOverlay = shouldDisplayOverlay(state)
+		syncOverlayVisibility(displayOverlay)
+
+		if not displayOverlay then
 			return
 		end
 
-		if state.playerState == "stopped" then
-			lyricsState = nil
-			currentTrackId = nil
-			updateOverlayTexts("Spotify", "Playback stopped", "")
-			return
-		end
-
-		if state.playerState == "error" then
-			updateOverlayTexts("Spotify", "Unable to query Spotify", "")
+		if not overlay then
 			return
 		end
 
@@ -442,6 +553,7 @@ end if
 			overlay:delete()
 			overlay = nil
 		end
+		text_size_state = nil
 		currentTrackId = nil
 		lyricsState = nil
 		dragContext = nil
@@ -451,14 +563,7 @@ end if
 		local visible = manager.getSetting(PACKAGE_ID, "overlay.visible", true)
 		local newVisible = not visible
 		manager.setSetting(PACKAGE_ID, "overlay.visible", newVisible)
-
-		if overlay then
-			if newVisible then
-				overlay:show()
-			else
-				overlay:hide()
-			end
-		end
+		render(currentTrackState)
 	end
 
 	function P.isVisible()
@@ -471,6 +576,32 @@ end if
 				title = (P.isVisible() and "Hide" or "Show") .. " Overlay",
 				fn = function()
 					P.toggleVisibility()
+				end,
+			},
+			{ title = "-" },
+			{
+				title = string.format("Scale (%.0f%%)", getOverlayScale() * 100),
+				disabled = true,
+			},
+			{
+				title = "Increase Size (+10%)",
+				fn = function()
+					bumpOverlayScale(0.1)
+					render(currentTrackState)
+				end,
+			},
+			{
+				title = "Decrease Size (-10%)",
+				fn = function()
+					bumpOverlayScale(-0.1)
+					render(currentTrackState)
+				end,
+			},
+			{
+				title = "Reset Size",
+				fn = function()
+					resetOverlaySizes()
+					render(currentTrackState)
 				end,
 			},
 		}
