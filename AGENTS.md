@@ -51,8 +51,19 @@ powerspoons/
 - Each package has `init.lua` as its entry point
 - Each package has `README.md` for documentation
 - Packages return a factory function that takes `manager` parameter
-- Factory returns a table with `start()`, `stop()`, and optionally `getMenuItems()` functions
+- Factory returns a table with `start()`, `stop()`, and optionally `getMenuItems()` and `getHotkeySpec()` functions
 - Package pattern: `return function(manager) ... end`
+
+### Docstrings (Optional)
+Packages can include docstrings at the top of init.lua for documentation:
+```lua
+--- Package Name
+--- Brief description of what the package does.
+---
+--- @package packageid
+--- @version 1.0.0
+--- @author yourname
+```
 
 ### Variables & Naming
 - `SCREAMING_SNAKE_CASE` for constants and config tables (e.g., `CONFIG`, `MODELS`, `LANGUAGES`)
@@ -96,6 +107,51 @@ powerspoons/
 - Manager handles all menubar rendering and updates
 - Packages should call menu refresh after state changes (handled by manager wrapper)
 
+### Hotkeys (Configurable)
+Packages can expose configurable hotkeys using the Spoons-compatible `getHotkeySpec()` convention:
+
+```lua
+-- Default hotkey (used if user hasn't customized)
+local DEFAULT_HOTKEY = { { "cmd", "shift" }, "s" }
+
+function P.getHotkeySpec()
+    return {
+        capture = {
+            fn = startCapture,  -- Simple: single function
+            description = "Start Capture",
+        },
+        record = {
+            fn = { press = startRecording, release = stopRecording },  -- Hold-style
+            description = "Hold to Record",
+        },
+    }
+end
+
+function P.start()
+    -- Get configured or default hotkey
+    local hotkeyDef = manager.getHotkey(PACKAGE_ID, "capture", DEFAULT_HOTKEY)
+    if hotkeyDef then
+        local spec = P.getHotkeySpec()
+        boundHotkeys = manager.bindHotkeysToSpec(PACKAGE_ID, spec, { capture = hotkeyDef })
+    end
+end
+```
+
+In `manifest.json`, declare hotkeys for UI configuration:
+```json
+{
+    "hotkeys": [
+        {
+            "action": "capture",
+            "description": "Start Capture",
+            "default": "Cmd+Shift+S"
+        }
+    ]
+}
+```
+
+Users can customize hotkeys via the menubar UI. The manager stores custom hotkeys in `settings/{packageId}.json` under the `hotkeys` key.
+
 ---
 
 ## Creating a New Package
@@ -112,38 +168,71 @@ touch packages/mypackage/README.md
 
 **`packages/mypackage/init.lua`:**
 ```lua
+--- My Package
+--- Does something cool with configurable hotkeys.
+---
+--- @package mypackage
+--- @version 1.0.0
+--- @author yourname
+
 return function(manager)
 	local P = {}
 	local PACKAGE_ID = "mypackage"
 	
+	-- Default hotkey (can be overridden via manager.getHotkey)
+	local DEFAULT_HOTKEY = { { "cmd", "shift" }, "m" }
+	
 	-- Package state
 	local myState = nil
+	local boundHotkeys = {}
 	
 	-- Load settings
 	local myConfig = manager.getSetting(PACKAGE_ID, "config", "default")
+	
+	local function doAction()
+		-- Do something
+		manager.setSetting(PACKAGE_ID, "lastUsed", os.time())
+		hs.notify.new({title="My Package", informativeText="Action triggered!"}):send()
+	end
+	
+	--- Returns hotkey specification for this package.
+	--- Used by the manager for hotkey configuration UI.
+	--- @return table Hotkey spec with action names mapped to functions
+	function P.getHotkeySpec()
+		return {
+			action = {
+				fn = doAction,
+				description = "Do Action",
+			},
+		}
+	end
 	
 	function P.start()
 		-- Initialize your package
 		hs.notify.new({title="My Package", informativeText="Started!"}):send()
 		
-		-- Example: set up hotkey
-		hs.hotkey.bind({"cmd", "shift"}, "m", function()
-			-- Do something
-			manager.setSetting(PACKAGE_ID, "lastUsed", os.time())
-		end)
+		-- Get configured or default hotkey
+		local hotkeyDef = manager.getHotkey(PACKAGE_ID, "action", DEFAULT_HOTKEY)
+		if hotkeyDef then
+			local spec = P.getHotkeySpec()
+			boundHotkeys = manager.bindHotkeysToSpec(PACKAGE_ID, spec, { action = hotkeyDef })
+		end
 	end
 	
 	function P.stop()
 		-- Clean up resources
-		hs.hotkey.deleteAll()
+		for _, hk in pairs(boundHotkeys) do
+			if hk then hk:delete() end
+		end
+		boundHotkeys = {}
 	end
 	
 	function P.getMenuItems()
 		return {
 			{
-				title = "My Action",
+				title = "Do Action Now",
 				fn = function()
-					-- Handle menu click
+					doAction()
 				end
 			}
 		}
@@ -166,7 +255,13 @@ end
       "description": "Does something cool",
       "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/mypackage/init.lua",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/mypackage/README.md",
-      "hotkey": "Cmd+Shift+M",
+      "hotkeys": [
+        {
+          "action": "action",
+          "description": "Do Action",
+          "default": "Cmd+Shift+M"
+        }
+      ],
       "secrets": [
         {
           "key": "MY_API_KEY",
@@ -234,6 +329,15 @@ manager.getSetting(packageId, key, default)     -- Get setting with default
 manager.setSetting(packageId, key, value)       -- Set setting
 manager.getSettings(packageId)                  -- Get all settings as table
 manager.setSettings(packageId, table)           -- Set all settings
+```
+
+### Hotkeys
+```lua
+manager.getHotkey(packageId, action, default)   -- Get configured hotkey with fallback
+manager.setHotkey(packageId, action, hotkeyDef) -- Set hotkey (nil to clear)
+manager.parseHotkeyString("Cmd+Shift+S")        -- Parse string to {{mods}, key}
+manager.formatHotkeyString({{"cmd", "shift"}, "s"}) -- Format to string
+manager.bindHotkeysToSpec(packageId, spec, mapping) -- Bind hotkeys from spec
 ```
 
 ## Package Lifecycle

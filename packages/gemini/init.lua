@@ -1,11 +1,19 @@
+--- Gemini OCR Package
+--- Screenshot OCR using Google Gemini API. Select a region to extract text.
+---
+--- @package gemini
+--- @version 1.0.0
+--- @author m0hill
+
 return function(manager)
 	local P = {}
 
 	local PACKAGE_ID = "gemini"
 
+	-- Default hotkey (can be overridden via manager.getHotkey)
+	local DEFAULT_HOTKEY = { { "cmd", "shift" }, "s" }
+
 	local CONFIG = {
-		HOTKEY_MODS = { "cmd", "shift" },
-		HOTKEY_KEY = "s",
 		MODEL = "gemini-flash-lite-latest",
 		MIME_TYPE = "image/png",
 		PROMPT = table.concat({
@@ -217,12 +225,31 @@ return function(manager)
 		end
 	end
 
+	--- Returns the hotkey specification for this package.
+	--- Used by the manager for hotkey configuration UI.
+	--- @return table Hotkey spec with action names mapped to functions
+	function P.getHotkeySpec()
+		return {
+			capture = {
+				fn = startCapture,
+				description = "Start Capture",
+			},
+		}
+	end
+
 	function P.start()
 		if state.hotkey then
 			state.hotkey:delete()
 			state.hotkey = nil
 		end
-		state.hotkey = hs.hotkey.bind(CONFIG.HOTKEY_MODS, CONFIG.HOTKEY_KEY, startCapture)
+
+		-- Get configured or default hotkey
+		local hotkeyDef = manager.getHotkey(PACKAGE_ID, "capture", DEFAULT_HOTKEY)
+		if hotkeyDef then
+			local spec = P.getHotkeySpec()
+			local boundHotkeys = manager.bindHotkeysToSpec(PACKAGE_ID, spec, { capture = hotkeyDef })
+			state.hotkey = boundHotkeys.capture
+		end
 	end
 
 	function P.stop()

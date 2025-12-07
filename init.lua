@@ -290,6 +290,164 @@ local PowerSpoons = (function()
 		end
 	end
 
+	-- Hotkey Binding API (similar to official Spoons convention)
+	-- Packages can expose actions via getHotkeySpec() and users can configure via bindHotkeys()
+	--
+	-- Example package implementation:
+	--   function P.getHotkeySpec()
+	--     return {
+	--       capture = { fn = startCapture, description = "Start capture" },
+	--       cancel = { fn = cancelCapture, description = "Cancel capture" },
+	--     }
+	--   end
+	--
+	-- User/manager calls:
+	--   package:bindHotkeys({ capture = {{"cmd", "shift"}, "s"} })
+	--
+	-- The mapping format follows official Spoons convention:
+	--   { actionName = { {modifiers}, key } }
+
+	--- Bind hotkeys for a package using the Spoons-compatible format
+	--- @param packageId string The package identifier
+	--- @param spec table The hotkey spec from package's getHotkeySpec()
+	--- @param mapping table User-provided hotkey mappings { action = {{mods}, key} }
+	--- @return table boundHotkeys Table of bound hotkey objects for cleanup
+	function M.bindHotkeysToSpec(packageId, spec, mapping)
+		local boundHotkeys = {}
+
+		if not spec or not mapping then
+			return boundHotkeys
+		end
+
+		for action, def in pairs(spec) do
+			local hotkeyDef = mapping[action]
+			if hotkeyDef and type(hotkeyDef) == "table" and #hotkeyDef >= 2 then
+				local mods = hotkeyDef[1] or {}
+				local key = hotkeyDef[2]
+
+				if key and def.fn then
+					local pressFn = nil
+					local releaseFn = nil
+
+					-- Support both simple functions and press/release pairs
+					if type(def.fn) == "function" then
+						pressFn = def.fn
+					elseif type(def.fn) == "table" then
+						pressFn = def.fn.press
+						releaseFn = def.fn.release
+					end
+
+					local hk
+					if releaseFn then
+						-- Hold-style hotkey (press to start, release to stop)
+						hk = hs.hotkey.bind(mods, key, pressFn, releaseFn)
+					else
+						-- Simple hotkey (just press)
+						hk = hs.hotkey.bind(mods, key, pressFn)
+					end
+
+					if hk then
+						boundHotkeys[action] = hk
+					end
+				end
+			end
+		end
+
+		return boundHotkeys
+	end
+
+	--- Parse a hotkey string like "Cmd+Shift+S" into {{mods}, key} format
+	--- @param hotkeyStr string The hotkey string (e.g., "Cmd+Shift+S", "Option+/")
+	--- @return table|nil Parsed hotkey in {{mods}, key} format, or nil if invalid
+	function M.parseHotkeyString(hotkeyStr)
+		if not hotkeyStr or hotkeyStr == "" then
+			return nil
+		end
+
+		local parts = {}
+		for part in hotkeyStr:gmatch("[^+]+") do
+			table.insert(parts, part:match("^%s*(.-)%s*$")) -- trim whitespace
+		end
+
+		if #parts == 0 then
+			return nil
+		end
+
+		local key = parts[#parts]
+		local mods = {}
+
+		local modMap = {
+			cmd = "cmd",
+			command = "cmd",
+			ctrl = "ctrl",
+			control = "ctrl",
+			alt = "alt",
+			option = "alt",
+			opt = "alt",
+			shift = "shift",
+		}
+
+		for i = 1, #parts - 1 do
+			local mod = modMap[parts[i]:lower()]
+			if mod then
+				table.insert(mods, mod)
+			end
+		end
+
+		return { mods, key }
+	end
+
+	--- Format a hotkey definition back to display string
+	--- @param hotkeyDef table Hotkey in {{mods}, key} format
+	--- @return string Formatted string like "Cmd+Shift+S"
+	function M.formatHotkeyString(hotkeyDef)
+		if not hotkeyDef or type(hotkeyDef) ~= "table" or #hotkeyDef < 2 then
+			return ""
+		end
+
+		local mods = hotkeyDef[1] or {}
+		local key = hotkeyDef[2] or ""
+
+		local modNames = {
+			cmd = "Cmd",
+			ctrl = "Ctrl",
+			alt = "Option",
+			shift = "Shift",
+		}
+
+		local parts = {}
+		for _, mod in ipairs(mods) do
+			local name = modNames[mod:lower()] or mod
+			table.insert(parts, name)
+		end
+		table.insert(parts, key:upper())
+
+		return table.concat(parts, "+")
+	end
+
+	--- Get configured hotkey for a package action, with fallback to default
+	--- @param packageId string The package identifier
+	--- @param action string The action name
+	--- @param defaultHotkey table|nil Default hotkey in {{mods}, key} format
+	--- @return table|nil The configured or default hotkey
+	function M.getHotkey(packageId, action, defaultHotkey)
+		local configured = M.getSetting(packageId, "hotkeys", {})
+		if configured[action] then
+			return configured[action]
+		end
+		return defaultHotkey
+	end
+
+	--- Set configured hotkey for a package action
+	--- @param packageId string The package identifier
+	--- @param action string The action name
+	--- @param hotkeyDef table|nil Hotkey in {{mods}, key} format, or nil to clear
+	function M.setHotkey(packageId, action, hotkeyDef)
+		local configured = M.getSetting(packageId, "hotkeys", {})
+		configured[action] = hotkeyDef
+		M.setSetting(packageId, "hotkeys", configured)
+	end
+
 	local function secretMask(value)
 		if not value or value == "" then
 			return "[Not set]"
@@ -370,6 +528,35 @@ local PowerSpoons = (function()
 				M.setSecret(secretDef.key, text)
 			else
 				M.setSecret(secretDef.key, nil)
+			end
+		end
+	end
+
+	local function openHotkeyPrompt(packageId, actionDef, onSave)
+		local currentHotkey = M.getHotkey(packageId, actionDef.action, actionDef.default)
+		local currentStr = currentHotkey and M.formatHotkeyString(currentHotkey) or ""
+
+		local hint = string.format(
+			"Enter hotkey for '%s'\nFormat: Cmd+Shift+S, Option+/, Ctrl+Alt+X\nLeave empty to use default: %s",
+			actionDef.description or actionDef.action,
+			actionDef.default and M.formatHotkeyString(actionDef.default) or "none"
+		)
+
+		local button, text = hs.dialog.textPrompt("Configure Hotkey", hint, currentStr, "Save", "Cancel")
+		if button == "Save" then
+			if text and text ~= "" then
+				local parsed = M.parseHotkeyString(text)
+				if parsed then
+					M.setHotkey(packageId, actionDef.action, parsed)
+				else
+					notify("Power Spoons", "Invalid hotkey format: " .. text)
+				end
+			else
+				-- Clear custom hotkey, revert to default
+				M.setHotkey(packageId, actionDef.action, nil)
+			end
+			if onSave then
+				onSave()
 			end
 		end
 	end
@@ -875,7 +1062,71 @@ local PowerSpoons = (function()
 						})
 					end
 
-					if def.hotkey then
+					-- Package hotkeys (configurable)
+					if def.hotkeys and #def.hotkeys > 0 then
+						table.insert(submenu, { title = "-" })
+						table.insert(submenu, {
+							title = "Hotkeys",
+							disabled = true,
+						})
+
+						for _, hkDef in ipairs(def.hotkeys) do
+							local defaultParsed = hkDef.default and M.parseHotkeyString(hkDef.default) or nil
+							local currentHotkey = M.getHotkey(def.id, hkDef.action, defaultParsed)
+							local displayStr = currentHotkey and M.formatHotkeyString(currentHotkey) or "[Not set]"
+							local isCustom = M.getSetting(def.id, "hotkeys", {})[hkDef.action] ~= nil
+
+							local hotkeyTitle = string.format(
+								"%s: %s%s",
+								hkDef.description or hkDef.action,
+								displayStr,
+								isCustom and " (custom)" or ""
+							)
+
+							table.insert(submenu, {
+								title = hotkeyTitle,
+								menu = {
+									{
+										title = "Change Hotkey…",
+										fn = function()
+											openHotkeyPrompt(def.id, {
+												action = hkDef.action,
+												description = hkDef.description,
+												default = defaultParsed,
+											}, function()
+												-- Restart package to rebind hotkeys
+												local instance = runtime.instances[def.id]
+												if instance then
+													stopPackage(def.id)
+													startPackage(def.id)
+												end
+												if runtime.menubar then
+													runtime.menubar:setMenu(buildMenu())
+												end
+											end)
+										end,
+									},
+									{
+										title = "Reset to Default",
+										disabled = not isCustom,
+										fn = function()
+											M.setHotkey(def.id, hkDef.action, nil)
+											-- Restart package to rebind hotkeys
+											local instance = runtime.instances[def.id]
+											if instance then
+												stopPackage(def.id)
+												startPackage(def.id)
+											end
+											if runtime.menubar then
+												runtime.menubar:setMenu(buildMenu())
+											end
+										end,
+									},
+								},
+							})
+						end
+					elseif def.hotkey then
+						-- Legacy: static hotkey display for packages without hotkeys array
 						table.insert(submenu, {
 							title = "Hotkey: " .. def.hotkey,
 							disabled = true,

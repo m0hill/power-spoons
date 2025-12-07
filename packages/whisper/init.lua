@@ -1,6 +1,16 @@
+--- Whisper Transcription Package
+--- Hold hotkey to record audio and automatically transcribe + paste using Groq's Whisper API.
+---
+--- @package whisper
+--- @version 1.0.0
+--- @author m0hill
+
 return function(manager)
 	local P = {}
 	local PACKAGE_ID = "whisper"
+
+	-- Default hotkey (can be overridden via manager.getHotkey)
+	local DEFAULT_HOTKEY = { { "alt" }, "/" }
 
 	local CONFIG = {
 		MODEL = "whisper-large-v3-turbo",
@@ -8,8 +18,6 @@ return function(manager)
 		MIN_BYTES = 1000,
 		MAX_HOLD_SECONDS = 300,
 		API_TIMEOUT = 90,
-		HOTKEY_MODS = { "alt" },
-		HOTKEY_KEY = "/",
 		ENABLE_NOTIFY = true,
 		ENABLE_SOUND = true,
 		RECORDING_INDICATOR_COLOR = { red = 1, green = 0, blue = 0, alpha = 0.9 },
@@ -502,12 +510,31 @@ return function(manager)
 		createRecordingIndicator()
 	end
 
+	--- Returns the hotkey specification for this package.
+	--- Used by the manager for hotkey configuration UI.
+	--- @return table Hotkey spec with action names mapped to functions
+	function P.getHotkeySpec()
+		return {
+			record = {
+				fn = { press = startRecording, release = stopRecordingAndTranscribe },
+				description = "Hold to Record",
+			},
+		}
+	end
+
 	function P.start()
 		if hotkey then
 			hotkey:delete()
 			hotkey = nil
 		end
-		hotkey = hs.hotkey.bind(CONFIG.HOTKEY_MODS, CONFIG.HOTKEY_KEY, startRecording, stopRecordingAndTranscribe)
+
+		-- Get configured or default hotkey
+		local hotkeyDef = manager.getHotkey(PACKAGE_ID, "record", DEFAULT_HOTKEY)
+		if hotkeyDef then
+			local spec = P.getHotkeySpec()
+			local boundHotkeys = manager.bindHotkeysToSpec(PACKAGE_ID, spec, { record = hotkeyDef })
+			hotkey = boundHotkeys.record
+		end
 	end
 
 	function P.stop()
