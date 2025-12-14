@@ -1,8 +1,8 @@
 --- Whisper Transcription Package
---- Hold hotkey to record audio and automatically transcribe + paste using Groq's Whisper API.
+--- Hold hotkey to record audio and automatically transcribe + paste using Groq or OpenAI Whisper API.
 ---
 --- @package whisper
---- @version 1.0.0
+--- @version 1.1.0
 --- @author m0hill
 
 return function(manager)
@@ -13,18 +13,23 @@ return function(manager)
 	local DEFAULT_HOTKEY = { { "alt" }, "/" }
 
 	local CONFIG = {
-		MODEL = "whisper-large-v3-turbo",
+		GROQ_MODEL = "whisper-large-v3-turbo",
+		OPENAI_MODEL = "whisper-1",
 		SAMPLE_RATE = 16000,
 		MIN_BYTES = 1000,
 		MAX_HOLD_SECONDS = 300,
 		API_TIMEOUT = 90,
 		ENABLE_NOTIFY = true,
 		ENABLE_SOUND = true,
+		DEFAULT_PROVIDER = "groq",
 		RECORDING_INDICATOR_COLOR = { red = 1, green = 0, blue = 0, alpha = 0.9 },
 		TRANSCRIBING_INDICATOR_COLOR = { red = 0, green = 0.8, blue = 1, alpha = 0.9 },
 	}
 
-	local API_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+	local API_URLS = {
+		groq = "https://api.groq.com/openai/v1/audio/transcriptions",
+		openai = "https://api.openai.com/v1/audio/transcriptions"
+	}
 
 	-- Runtime vars
 	local rec_path = nil
@@ -45,6 +50,7 @@ return function(manager)
 	local settings = {
 		enableNotify = manager.getSetting(PACKAGE_ID, "enableNotify", CONFIG.ENABLE_NOTIFY),
 		enableSound = manager.getSetting(PACKAGE_ID, "enableSound", CONFIG.ENABLE_SOUND),
+		provider = manager.getSetting(PACKAGE_ID, "provider", CONFIG.DEFAULT_PROVIDER),
 	}
 
 	local function saveSetting(key, value)
@@ -58,6 +64,10 @@ return function(manager)
 
 	local function toggleSoundSetting()
 		saveSetting("enableSound", not settings.enableSound)
+	end
+
+	local function setProvider(provider)
+		saveSetting("provider", provider)
 	end
 
 	local function notify(title, text, sound)
@@ -331,14 +341,33 @@ return function(manager)
 	end
 
 	local function transcribeAudio(path)
-		local apiKey = manager.getSecret("GROQ_API_KEY")
-		if not apiKey or apiKey == "" then
-			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
-			playSound("error")
-			if path then
-				os.remove(path)
+		local provider = settings.provider or CONFIG.DEFAULT_PROVIDER
+		local apiKey, apiUrl, model
+		
+		if provider == "openai" then
+			apiKey = manager.getSecret("OPENAI_API_KEY")
+			apiUrl = API_URLS.openai
+			model = CONFIG.OPENAI_MODEL
+			if not apiKey or apiKey == "" then
+				notify("Whisper", "Missing OpenAI API key.\nSet it via Power Spoons → Secrets.")
+				playSound("error")
+				if path then
+					os.remove(path)
+				end
+				return
 			end
-			return
+		else
+			apiKey = manager.getSecret("GROQ_API_KEY")
+			apiUrl = API_URLS.groq
+			model = CONFIG.GROQ_MODEL
+			if not apiKey or apiKey == "" then
+				notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
+				playSound("error")
+				if path then
+					os.remove(path)
+				end
+				return
+			end
 		end
 
 		local attrs = path and hs.fs.attributes(path)
@@ -368,12 +397,12 @@ return function(manager)
 			"-F",
 			"file=@" .. path .. ";type=audio/wav",
 			"-F",
-			"model=" .. CONFIG.MODEL,
+			"model=" .. model,
 			"-F",
 			"response_format=json",
 			"-w",
 			'__CURL_TIMING__{"time_total":"%{time_total}","time_upload":"%{time_upload}","time_starttransfer":"%{time_starttransfer}","time_download":"%{time_download}"}',
-			API_URL,
+			apiUrl,
 		}
 
 		local curl = hs.task.new("/usr/bin/curl", function(exitCode, out, err)
@@ -603,6 +632,24 @@ return function(manager)
 				fn = function()
 					toggleSoundSetting()
 				end,
+			},
+			{ title = "-" },
+			{
+				title = "Provider",
+				menu = {
+					{
+						title = (settings.provider == "groq" and "✓ " or "") .. "Groq",
+						fn = function()
+							setProvider("groq")
+						end,
+					},
+					{
+						title = (settings.provider == "openai" and "✓ " or "") .. "OpenAI",
+						fn = function()
+							setProvider("openai")
+						end,
+					},
+				},
 			},
 		}
 	end

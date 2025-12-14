@@ -1,6 +1,6 @@
 # Whisper Transcription
 
-Voice-to-text transcription powered by Groq's Whisper API.
+Voice-to-text transcription powered by Groq or OpenAI Whisper API.
 
 ## Overview
 
@@ -10,7 +10,8 @@ Hold a hotkey to record audio, then release to automatically transcribe and past
 
 - **Hold-to-record**: Press and hold `Option+/` to start recording
 - **Auto-paste**: Transcribed text is automatically typed at your cursor position
-- **Fast processing**: Uses Groq's optimized Whisper model for quick results
+- **Fast processing**: Uses Groq's optimized Whisper model or OpenAI's Whisper for quick results
+- **Provider choice**: Switch between Groq and OpenAI APIs
 - **Audio feedback**: Plays sounds on start, stop, success, and error
 - **Visual notifications**: Shows status updates during recording and processing
 
@@ -26,10 +27,20 @@ The `sox` utility is required for audio recording.
 
 ### 2. Get API Key
 
+Choose either Groq (faster, free tier) or OpenAI (more reliable):
+
+**Option A: Groq (Recommended)**
 1. Sign up at [Groq Console](https://console.groq.com/)
 2. Navigate to [API Keys](https://console.groq.com/keys)
 3. Create a new API key
 4. In Power Spoons menu, go to **Whisper Transcription → Groq API Key → Set / Update…**
+5. Paste your API key
+
+**Option B: OpenAI**
+1. Sign up at [OpenAI Platform](https://platform.openai.com/)
+2. Navigate to [API Keys](https://platform.openai.com/api-keys)
+3. Create a new API key
+4. In Power Spoons menu, go to **Whisper Transcription → OpenAI API Key → Set / Update…**
 5. Paste your API key
 
 ### 3. Enable the Package
@@ -47,20 +58,21 @@ Click **Enable** in the Whisper Transcription submenu.
 
 ## Configuration
 
-Use the Power Spoons menubar → Whisper Transcription submenu to toggle:
+Use the Power Spoons menubar → Whisper Transcription submenu to configure:
 
 - Show notifications
 - Play sounds
+- Provider (Groq or OpenAI)
 
 For advanced tweaks, edit `packages/whisper/init.lua`:
 
-- `MODEL`: Whisper model variant (default: `whisper-large-v3-turbo`)
+- `GROQ_MODEL`: Groq Whisper model (default: `whisper-large-v3-turbo`)
+- `OPENAI_MODEL`: OpenAI Whisper model (default: `whisper-1`)
+- `DEFAULT_PROVIDER`: Default API provider (default: `groq`)
 - `SAMPLE_RATE`: Audio quality (default: 16000 Hz)
 - `MIN_BYTES`: Minimum recording size (default: 1000 bytes)
 - `MAX_HOLD_SECONDS`: Maximum recording duration (default: 300 seconds)
 - `API_TIMEOUT`: API request timeout (default: 90 seconds)
-- `HOTKEY_MODS`: Hotkey modifiers (default: `{ "alt" }`)
-- `HOTKEY_KEY`: Hotkey key (default: `"/"`)
 - `ENABLE_NOTIFY`: Show notifications (default: true)
 - `ENABLE_SOUND`: Play sounds (default: true)
 
@@ -82,6 +94,7 @@ For advanced tweaks, edit `packages/whisper/init.lua`:
 ## Technical Details
 
 - Uses `sox` for high-quality audio recording at 16kHz mono
-- Sends audio to Groq's Whisper API endpoint
+- Sends audio to Groq or OpenAI Whisper API endpoints
 - Simulates keyboard input to paste transcribed text
 - Cleans up temporary audio files automatically
+- Supports switching between providers via menu

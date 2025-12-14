@@ -4,7 +4,7 @@
     {
       "id": "whisper",
       "name": "Whisper Transcription",
-      "description": "Hold hotkey to record and auto-paste transcription.",
+      "description": "Hold hotkey to record and auto-paste transcription via Groq or OpenAI.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/whisper/README.md",
       "version": "1.1.0",
       "author": "m0hill",
@@ -22,6 +22,11 @@
           "key": "GROQ_API_KEY",
           "label": "Groq API Key",
           "hint": "Get from https://console.groq.com/keys"
+        },
+        {
+          "key": "OPENAI_API_KEY",
+          "label": "OpenAI API Key",
+          "hint": "Get from https://platform.openai.com/api-keys"
         }
       ],
       "dependencies": {
