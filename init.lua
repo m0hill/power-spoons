@@ -987,11 +987,11 @@ local PowerSpoons = (function()
 						anyInstalled = true
 					end
 
-					local status = ""
+local status = ""
 					if flags.enabled then
-						status = " (enabled)"
+						status = " ✓"
 					else
-						status = " (disabled)"
+						status = " ✗"
 					end
 
 					local installedVersion = flags.version or "unknown"
@@ -1030,7 +1030,7 @@ local PowerSpoons = (function()
 					end
 
 					table.insert(submenu, {
-						title = "Uninstall…",
+						title = "Uninstall",
 						fn = function()
 							uninstallPackage(def.id)
 							if runtime.menubar then
@@ -1039,28 +1039,37 @@ local PowerSpoons = (function()
 						end,
 					})
 					table.insert(submenu, { title = "-" })
-					table.insert(submenu, {
-						title = def.description or "",
-						disabled = true,
-					})
-					table.insert(submenu, {
-						title = "Installed version: " .. installedVersion,
-						disabled = true,
-					})
-					table.insert(submenu, {
-						title = "Latest version: " .. latestVersion,
-						disabled = true,
-					})
+
+					-- Package info submenu
+					local infoSubmenu = {
+						{
+							title = def.description or "No description available",
+							disabled = true,
+						},
+						{
+							title = "Installed version: " .. installedVersion,
+							disabled = true,
+						},
+						{
+							title = "Latest version: " .. latestVersion,
+							disabled = true,
+						},
+					}
 
 					-- Add README link if available
 					if def.readme then
-						table.insert(submenu, {
-							title = "ℹ️  View README…",
+						table.insert(infoSubmenu, {
+							title = "View README",
 							fn = function()
 								hs.urlevent.openURL(def.readme)
 							end,
 						})
 					end
+
+table.insert(submenu, {
+						title = "Info",
+						menu = infoSubmenu,
+					})
 
 					-- Package hotkeys (configurable)
 					if def.hotkeys and #def.hotkeys > 0 then
@@ -1087,7 +1096,7 @@ local PowerSpoons = (function()
 								title = hotkeyTitle,
 								menu = {
 									{
-										title = "Change Hotkey…",
+										title = "Change Hotkey",
 										fn = function()
 											openHotkeyPrompt(def.id, {
 												action = hkDef.action,
@@ -1151,7 +1160,7 @@ local PowerSpoons = (function()
 								title = lineTitle,
 								menu = {
 									{
-										title = "Set / Update…",
+										title = "Set / Update",
 										fn = function()
 											openSecretPrompt(s)
 											if runtime.menubar then
@@ -1256,7 +1265,7 @@ local PowerSpoons = (function()
 					-- Add README link if available
 					if def.readme then
 						table.insert(availableSubmenu, {
-							title = "ℹ️  View README…",
+							title = "View README",
 							fn = function()
 								hs.urlevent.openURL(def.readme)
 							end,
@@ -1288,7 +1297,7 @@ local PowerSpoons = (function()
 		})
 
 		table.insert(menu, {
-			title = "About Power Spoons…",
+			title = "About Power Spoons",
 			fn = function()
 				local stateAbout = loadState()
 				local lastRefreshStr = "Never"
@@ -1332,8 +1341,8 @@ Repository: github.com/m0hill/power-spoons]],
 		if not runtime.menubar then
 			runtime.menubar = hs.menubar.new()
 		end
-		runtime.menubar:setTitle("⚡")
-		runtime.menubar:setTooltip("Power Spoons – Package Manager")
+		runtime.menubar:setIcon(hs.image.imageFromName("NSSlideshowTemplate"))
+		runtime.menubar:setTooltip("Power Spoons")
 
 		-- Load persistent state
 		local state = loadState()
