@@ -1,26 +1,10 @@
 # Power Spoons
 
-> A simple, secure package manager for Hammerspoon productivity tools
+> A remote package manager for Hammerspoon productivity tools
 
-Replace bloated Electron apps with lightweight, native macOS automation using Lua scripts. Power Spoons brings you professional-grade productivity tools that integrate seamlessly with macOS through a single menubar icon.
+Power Spoons is a Hammerspoon Spoon that installs and manages productivity packages from a central manifest, with settings stored as plain JSON.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## Why Power Spoons?
-
-**Before Power Spoons:**
-- Complicated installation scripts
-- Multiple shell commands
-- Scattered configuration files
-- Manual API key management
-- Security risks with external installers
-
-**With Power Spoons:**
-- **One copy-paste**: Single snippet to get started
-- **One icon**: All packages managed from one menubar icon
-- **Visual management**: Install/uninstall with clicks, not commands
-- **Transparent**: All config stored in readable JSON files
-- **Works everywhere**: New users and existing Hammerspoon users alike
+Built on [Hammerspoon](https://www.hammerspoon.org/). Licensed under [MIT](https://opensource.org/licenses/MIT).
 
 ---
 
@@ -59,19 +43,15 @@ Floating synchronized lyrics overlay for Spotify.
 
 ## Installation
 
-### Quick Start (Recommended)
+### Quick Start
 
 **Step 1**: Install Hammerspoon
 
-If you don't have Hammerspoon installed:
-- Download from [hammerspoon.org](https://www.hammerspoon.org/)
-- Or: `brew install --cask hammerspoon`
+Download from [hammerspoon.org](https://www.hammerspoon.org/).
 
 **Step 2**: Install the Spoon
 
-Option A (recommended): download a release and double-click `PowerSpoons.spoon` to install it.
-
-Option B (manual): copy `PowerSpoons.spoon` into `~/.hammerspoon/Spoons/`.
+Download the latest release and double-click `PowerSpoons.spoon` to install it.
 
 **Step 3**: Load it from your `~/.hammerspoon/init.lua`
 
@@ -86,7 +66,7 @@ Press `Cmd+Ctrl+R` or click "Reload Config" in the Hammerspoon console.
 
 **Step 5**: Install packages
 
-Click the ⚡ icon in your menubar → Install packages → Set API keys → Done!
+Click the Power Spoons icon in your menubar → Install packages → Set API keys → Done!
 
 ---
 
@@ -94,10 +74,10 @@ Click the ⚡ icon in your menubar → Install packages → Set API keys → Don
 
 ### Managing Packages
 
-Everything is done from the **⚡ menubar icon**:
+Everything is done from the Power Spoons menubar icon:
 
 **Installing a package:**
-1. Click ⚡ icon
+1. Click the Power Spoons icon
 2. Click "+ Package Name" under "Available"
 3. Click "Install & Enable"
 4. Package is now running!
@@ -107,7 +87,7 @@ Everything is done from the **⚡ menubar icon**:
 - Click "Enable" or "Disable"
 
 **Setting API Keys:**
-1. Click ⚡ icon
+1. Click the Power Spoons icon
 2. Click on an installed package
 3. Find "API Keys / Secrets" section
 4. Click "Set / Update…" for the key you need
@@ -158,13 +138,13 @@ Each package has its own settings accessible from its submenu:
 1. Sign up at [console.groq.com](https://console.groq.com)
 2. Navigate to [API Keys](https://console.groq.com/keys)
 3. Create a new API key
-4. Set it via ⚡ → Secrets / API Keys → Groq API Key → Set / Update…
+4. Set it via the Power Spoons menu → Secrets / API Keys → Groq API Key → Set / Update…
 
 **Pricing**: Whisper Large v3 Turbo is $0.04/hour of audio (very affordable!)
 
 ### Gemini API (for OCR)
 1. Get a key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Set it via ⚡ → Secrets / API Keys → Gemini API Key → Set / Update…
+2. Set it via the Power Spoons menu → Secrets / API Keys → Gemini API Key → Set / Update…
 
 **Pricing**: Gemini Flash Lite has a generous free tier
 
@@ -191,37 +171,6 @@ Power Spoons uses a **remote package system** that's simple and secure:
 - ✅ Package code is fetched from the official repo only
 - ✅ API keys stored in `~/.hammerspoon/powerspoons/secrets.json`
 - ✅ All code runs in Hammerspoon's Lua sandbox
-
----
-
-## For Existing Hammerspoon Users
-
-**Power Spoons is designed to coexist** with your existing configuration:
-
-- **Load as a Spoon**: Add `hs.loadSpoon("PowerSpoons")` and `spoon.PowerSpoons:start()` wherever you like
-- **Namespace**: All settings are stored under `~/.hammerspoon/powerspoons/`
-- **No conflicts**: Doesn't touch your existing hotkeys, menubar items, or timers
-- **Optional**: You can mix Power Spoons packages with your own scripts
-
-Example existing `init.lua`:
-
-```lua
--- Your existing config
-hs.hotkey.bind({"cmd"}, "space", function()
-    hs.application.launchOrFocus("Terminal")
-end)
-
--- ... other stuff ...
-
-----------------------------------------------------------------------
--- Power Spoons (paste the entire Power Spoons code here)
-----------------------------------------------------------------------
-local PowerSpoons = (function()
-    -- ... (Power Spoons code)
-end)()
-
-PowerSpoons.init()
-```
 
 ---
 
@@ -309,13 +258,13 @@ See [AGENTS.md](AGENTS.md) for detailed guidelines:
 1. **Manifest**: `manifest.json` on GitHub lists all available packages
 2. **Auto-refresh**: Manager checks for new packages every 24 hours
 3. **On-demand download**: Packages are downloaded only when you install them
-4. **Local cache**: Downloaded packages are saved to `~/.hammerspoon/powerspoons_cache/`
+4. **Local cache**: Downloaded packages are saved to `~/.hammerspoon/powerspoons/cache/`
 5. **Persistent state**: Your settings survive updates
 
 ### Customizing Packages
 
 **Edit a cached package:**
-1. Navigate to: `~/.hammerspoon/powerspoons_cache/`
+1. Navigate to: `~/.hammerspoon/powerspoons/cache/`
 2. Edit the package file (e.g., `whisper.lua`)
 3. Modify the `CONFIG` table at the top
 4. Reload Hammerspoon
@@ -325,9 +274,12 @@ See [AGENTS.md](AGENTS.md) for detailed guidelines:
 **Use a custom manifest** (for your own forks):
 1. Fork the Power Spoons repository
 2. Modify packages in your fork
-3. Update `MANIFEST_URL` in `init.lua` to point to your fork:
+3. Update your Spoon config in `~/.hammerspoon/init.lua`:
    ```lua
-   local MANIFEST_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/power-spoons/main/manifest.json"
+   hs.loadSpoon("PowerSpoons")
+   spoon.PowerSpoons:setConfig({
+     manifestUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/power-spoons/main/manifest.json",
+   }):start()
    ```
 4. Reload Hammerspoon → packages will be fetched from your fork
 
@@ -335,14 +287,17 @@ See [AGENTS.md](AGENTS.md) for detailed guidelines:
 
 ```
 ~/.hammerspoon/
-├── init.lua                          # Your config (contains Power Spoons manager)
-└── powerspoons_cache/                # Downloaded packages
-    ├── whisper.lua
-    ├── gemini.lua
-    └── lyrics.lua
+├── init.lua                          # Your config (loads the Power Spoons Spoon)
+├── Spoons/
+│   └── PowerSpoons.spoon/            # Power Spoons manager code
+└── powerspoons/                      # Runtime state and caches
+    ├── state.json
+    ├── secrets.json
+    ├── settings/
+    └── cache/
 ```
 
-Settings are stored via `hs.settings` under the key `powerspoons.state` (not in files).
+Settings and secrets are stored as JSON files under `~/.hammerspoon/powerspoons/`.
 
 ---
 
@@ -353,7 +308,7 @@ Settings are stored via `hs.settings` under the key `powerspoons.state` (not in 
 - Reload Hammerspoon config
 
 **"No API key set"**
-- Click ⚡ → Secrets / API Keys
+- Click the Power Spoons menu → Secrets / API Keys
 - Set the required key
 - Try again
 
@@ -367,8 +322,9 @@ Settings are stored via `hs.settings` under the key `powerspoons.state` (not in 
 - Check Hammerspoon console for errors
 
 **"I want to completely remove Power Spoons"**
-- Delete the Power Spoons code from your `init.lua`
-- Reload config
+- Remove `PowerSpoons.spoon` from `~/.hammerspoon/Spoons/`
+- Remove the load/start lines from `~/.hammerspoon/init.lua`
+- Reload Hammerspoon
 - (Optional) Delete config directory: `rm -rf ~/.hammerspoon/powerspoons`
 
 ---
@@ -394,8 +350,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Credits
 
 - **Hammerspoon** - [www.hammerspoon.org](https://www.hammerspoon.org/)
-- **Groq** - Lightning-fast Whisper API
-- **Google Gemini** - Powerful multimodal AI
 - **lrclib.net** - Free lyrics API
 
 ---
