@@ -1,0 +1,209 @@
+[
+  {
+    "Constant" : [
+
+    ],
+    "submodules" : [
+
+    ],
+    "Function" : [
+
+    ],
+    "Variable" : [
+
+    ],
+    "stripped_doc" : [
+
+    ],
+    "Deprecated" : [
+
+    ],
+    "desc" : "Remote package manager for Hammerspoon productivity tools.",
+    "type" : "Module",
+    "Constructor" : [
+
+    ],
+    "Field" : [
+
+    ],
+    "Method" : [
+      {
+        "name" : "init",
+        "desc" : "Initializes the Spoon configuration state.",
+        "stripped_doc" : [
+          "Initializes the Spoon configuration state.",
+          ""
+        ],
+        "doc" : "Initializes the Spoon configuration state.\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:init()",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:init()",
+        "parameters" : [
+
+        ]
+      },
+      {
+        "name" : "setConfig",
+        "desc" : "Sets configuration overrides for the manager.",
+        "stripped_doc" : [
+          "Sets configuration overrides for the manager.",
+          ""
+        ],
+        "doc" : "Sets configuration overrides for the manager.\n\nParameters:\n * opts - Table with optional keys: manifestUrl, autoRefreshInterval, baseDir\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:setConfig(opts)",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:setConfig(opts)",
+        "parameters" : [
+          " * opts - Table with optional keys: manifestUrl, autoRefreshInterval, baseDir",
+          ""
+        ]
+      },
+      {
+        "name" : "start",
+        "desc" : "Starts the Power Spoons manager and menubar.",
+        "stripped_doc" : [
+          "Starts the Power Spoons manager and menubar.",
+          ""
+        ],
+        "doc" : "Starts the Power Spoons manager and menubar.\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:start()",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:start()",
+        "parameters" : [
+
+        ]
+      },
+      {
+        "name" : "stop",
+        "desc" : "Stops the Power Spoons manager and cleans up runtime resources.",
+        "stripped_doc" : [
+          "Stops the Power Spoons manager and cleans up runtime resources.",
+          ""
+        ],
+        "doc" : "Stops the Power Spoons manager and cleans up runtime resources.\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:stop()",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:stop()",
+        "parameters" : [
+
+        ]
+      }
+    ],
+    "Command" : [
+
+    ],
+    "doc" : "Remote package manager for Hammerspoon productivity tools.",
+    "items" : [
+      {
+        "name" : "init",
+        "desc" : "Initializes the Spoon configuration state.",
+        "stripped_doc" : [
+          "Initializes the Spoon configuration state.",
+          ""
+        ],
+        "doc" : "Initializes the Spoon configuration state.\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:init()",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:init()",
+        "parameters" : [
+
+        ]
+      },
+      {
+        "name" : "setConfig",
+        "desc" : "Sets configuration overrides for the manager.",
+        "stripped_doc" : [
+          "Sets configuration overrides for the manager.",
+          ""
+        ],
+        "doc" : "Sets configuration overrides for the manager.\n\nParameters:\n * opts - Table with optional keys: manifestUrl, autoRefreshInterval, baseDir\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:setConfig(opts)",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:setConfig(opts)",
+        "parameters" : [
+          " * opts - Table with optional keys: manifestUrl, autoRefreshInterval, baseDir",
+          ""
+        ]
+      },
+      {
+        "name" : "start",
+        "desc" : "Starts the Power Spoons manager and menubar.",
+        "stripped_doc" : [
+          "Starts the Power Spoons manager and menubar.",
+          ""
+        ],
+        "doc" : "Starts the Power Spoons manager and menubar.\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:start()",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:start()",
+        "parameters" : [
+
+        ]
+      },
+      {
+        "name" : "stop",
+        "desc" : "Stops the Power Spoons manager and cleans up runtime resources.",
+        "stripped_doc" : [
+          "Stops the Power Spoons manager and cleans up runtime resources.",
+          ""
+        ],
+        "doc" : "Stops the Power Spoons manager and cleans up runtime resources.\n\nReturns:\n * The PowerSpoons object",
+        "notes" : [
+
+        ],
+        "signature" : "PowerSpoons:stop()",
+        "type" : "Method",
+        "returns" : [
+          " * The PowerSpoons object"
+        ],
+        "def" : "PowerSpoons:stop()",
+        "parameters" : [
+
+        ]
+      }
+    ],
+    "name" : "PowerSpoons"
+  }
+]

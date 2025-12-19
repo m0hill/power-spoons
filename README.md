@@ -59,7 +59,7 @@ Floating synchronized lyrics overlay for Spotify.
 
 ## Installation
 
-### Quick Start (Works for Everyone)
+### Quick Start (Recommended)
 
 **Step 1**: Install Hammerspoon
 
@@ -67,19 +67,24 @@ If you don't have Hammerspoon installed:
 - Download from [hammerspoon.org](https://www.hammerspoon.org/)
 - Or: `brew install --cask hammerspoon`
 
-**Step 2**: Copy the Power Spoons code
+**Step 2**: Install the Spoon
 
-1. Open this file: `~/.hammerspoon/init.lua` (create it if it doesn't exist)
-2. Copy the entire contents of [init.lua](init.lua) from this repository
-3. Paste it into your `~/.hammerspoon/init.lua`
+Option A (recommended): download a release and double-click `PowerSpoons.spoon` to install it.
 
-> **Note for existing Hammerspoon users**: Just paste the Power Spoons code at the end of your existing `init.lua`. It won't interfere with your current setup.
+Option B (manual): copy `PowerSpoons.spoon` into `~/.hammerspoon/Spoons/`.
 
-**Step 3**: Reload Hammerspoon
+**Step 3**: Load it from your `~/.hammerspoon/init.lua`
+
+```lua
+hs.loadSpoon("PowerSpoons")
+spoon.PowerSpoons:start()
+```
+
+**Step 4**: Reload Hammerspoon
 
 Press `Cmd+Ctrl+R` or click "Reload Config" in the Hammerspoon console.
 
-**Step 4**: Install packages
+**Step 5**: Install packages
 
 Click the ⚡ icon in your menubar → Install packages → Set API keys → Done!
 
@@ -169,22 +174,22 @@ Each package has its own settings accessible from its submenu:
 
 Power Spoons uses a **remote package system** that's simple and secure:
 
-1. **You copy once**: Paste the manager code into `~/.hammerspoon/init.lua`
+1. **You install once**: Add the Spoon to `~/.hammerspoon/Spoons/PowerSpoons.spoon`
 2. **Manager fetches packages**: When you install a package, it's downloaded from GitHub
 3. **Auto-updates**: The package list refreshes automatically (every 24 hours) or manually via "Refresh" button
-4. **Local caching**: Downloaded packages are cached in `~/.hammerspoon/powerspoons_cache/`
+4. **Local caching**: Downloaded packages are cached in `~/.hammerspoon/powerspoons/cache/`
 5. **Safe execution**: Package code is loaded in a sandbox and can only access the manager API
 
 **What gets stored where:**
-- **Manager code**: In your `init.lua` (you paste this once)
+- **Manager code**: In `~/.hammerspoon/Spoons/PowerSpoons.spoon/`
 - **Package list**: Fetched from `manifest.json` on GitHub, cached locally
 - **Package code**: Downloaded from GitHub when installed, cached locally
-- **Your settings**: Installed packages, enabled state, API keys → stored via `hs.settings`
+- **Your settings**: Installed packages, enabled state, API keys → stored as JSON files
 
 **Security:**
-- ✅ Manager code is minimal and visible (you paste it)
+- ✅ Manager code is visible and isolated (Spoon)
 - ✅ Package code is fetched from the official repo only
-- ✅ API keys stored via Hammerspoon's secure settings (not plain text files)
+- ✅ API keys stored in `~/.hammerspoon/powerspoons/secrets.json`
 - ✅ All code runs in Hammerspoon's Lua sandbox
 
 ---
@@ -193,8 +198,8 @@ Power Spoons uses a **remote package system** that's simple and secure:
 
 **Power Spoons is designed to coexist** with your existing configuration:
 
-- **Paste at the end**: Just add the Power Spoons code after your existing config
-- **Namespace**: All settings are prefixed with `powerspoons.*`
+- **Load as a Spoon**: Add `hs.loadSpoon("PowerSpoons")` and `spoon.PowerSpoons:start()` wherever you like
+- **Namespace**: All settings are stored under `~/.hammerspoon/powerspoons/`
 - **No conflicts**: Doesn't touch your existing hotkeys, menubar items, or timers
 - **Optional**: You can mix Power Spoons packages with your own scripts
 

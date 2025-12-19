@@ -1,15 +1,18 @@
--- Power Spoons – Remote Package Manager for Hammerspoon
--- Paste this into your ~/.hammerspoon/init.lua and reload config.
+--- === PowerSpoons ===
+---
+--- Remote package manager for Hammerspoon productivity tools.
 
-local PowerSpoons = (function()
+local function createManager(config)
+	config = config or {}
 	-- Configuration
-	local MANIFEST_URL = "https://raw.githubusercontent.com/m0hill/power-spoons/main/manifest.json"
-	local POWERSPOONS_DIR = os.getenv("HOME") .. "/.hammerspoon/powerspoons"
+	local MANIFEST_URL = config.manifestUrl
+		or "https://raw.githubusercontent.com/m0hill/power-spoons/main/manifest.json"
+	local POWERSPOONS_DIR = config.baseDir or (os.getenv("HOME") .. "/.hammerspoon/powerspoons")
 	local STATE_FILE = POWERSPOONS_DIR .. "/state.json"
 	local SECRETS_FILE = POWERSPOONS_DIR .. "/secrets.json"
 	local SETTINGS_DIR = POWERSPOONS_DIR .. "/settings"
 	local CACHE_DIR = POWERSPOONS_DIR .. "/cache"
-	local AUTO_REFRESH_INTERVAL = 24 * 60 * 60 -- 24 hours
+	local AUTO_REFRESH_INTERVAL = config.autoRefreshInterval or (24 * 60 * 60) -- 24 hours
 
 	-- Manager API
 	local M = {}
@@ -324,11 +327,7 @@ local PowerSpoons = (function()
 	-- The mapping format follows official Spoons convention:
 	--   { actionName = { {modifiers}, key } }
 
-	--- Bind hotkeys for a package using the Spoons-compatible format
-	--- @param packageId string The package identifier
-	--- @param spec table The hotkey spec from package's getHotkeySpec()
-	--- @param mapping table User-provided hotkey mappings { action = {{mods}, key} }
-	--- @return table boundHotkeys Table of bound hotkey objects for cleanup
+	-- Bind hotkeys for a package using the Spoons-compatible format
 	function M.bindHotkeysToSpec(packageId, spec, mapping)
 		local boundHotkeys = {}
 
@@ -373,9 +372,7 @@ local PowerSpoons = (function()
 		return boundHotkeys
 	end
 
-	--- Parse a hotkey string like "Cmd+Shift+S" into {{mods}, key} format
-	--- @param hotkeyStr string The hotkey string (e.g., "Cmd+Shift+S", "Option+/")
-	--- @return table|nil Parsed hotkey in {{mods}, key} format, or nil if invalid
+	-- Parse a hotkey string like "Cmd+Shift+S" into {{mods}, key} format
 	function M.parseHotkeyString(hotkeyStr)
 		if not hotkeyStr or hotkeyStr == "" then
 			return nil
@@ -414,9 +411,7 @@ local PowerSpoons = (function()
 		return { mods, key }
 	end
 
-	--- Format a hotkey definition back to display string
-	--- @param hotkeyDef table Hotkey in {{mods}, key} format
-	--- @return string Formatted string like "Cmd+Shift+S"
+	-- Format a hotkey definition back to display string
 	function M.formatHotkeyString(hotkeyDef)
 		if not hotkeyDef or type(hotkeyDef) ~= "table" or #hotkeyDef < 2 then
 			return ""
@@ -442,11 +437,7 @@ local PowerSpoons = (function()
 		return table.concat(parts, "+")
 	end
 
-	--- Get configured hotkey for a package action, with fallback to default
-	--- @param packageId string The package identifier
-	--- @param action string The action name
-	--- @param defaultHotkey table|nil Default hotkey in {{mods}, key} format
-	--- @return table|nil The configured or default hotkey
+	-- Get configured hotkey for a package action, with fallback to default
 	function M.getHotkey(packageId, action, defaultHotkey)
 		local configured = M.getSetting(packageId, "hotkeys", {})
 		if configured[action] then
@@ -455,10 +446,7 @@ local PowerSpoons = (function()
 		return defaultHotkey
 	end
 
-	--- Set configured hotkey for a package action
-	--- @param packageId string The package identifier
-	--- @param action string The action name
-	--- @param hotkeyDef table|nil Hotkey in {{mods}, key} format, or nil to clear
+	-- Set configured hotkey for a package action
 	function M.setHotkey(packageId, action, hotkeyDef)
 		local configured = M.getSetting(packageId, "hotkeys", {})
 		configured[action] = hotkeyDef
@@ -1388,8 +1376,82 @@ Repository: github.com/m0hill/power-spoons]],
 		end
 	end
 
-	return M
-end)()
+	function M.stop()
+		for id, _ in pairs(runtime.instances) do
+			stopPackage(id)
+		end
+		if runtime.menubar then
+			runtime.menubar:delete()
+			runtime.menubar = nil
+		end
+	end
 
--- Initialize Power Spoons on config load
-PowerSpoons.init()
+	return M
+end
+
+local PowerSpoons = {}
+PowerSpoons.__index = PowerSpoons
+
+PowerSpoons.name = "PowerSpoons"
+PowerSpoons.version = "1.0.0"
+PowerSpoons.author = "m0hill"
+PowerSpoons.license = "MIT"
+PowerSpoons.homepage = "https://github.com/m0hill/power-spoons"
+
+--- PowerSpoons:init()
+--- Method
+--- Initializes the Spoon configuration state.
+---
+--- Returns:
+---  * The PowerSpoons object
+function PowerSpoons:init()
+	if not self.config then
+		self.config = {}
+	end
+	return self
+end
+
+--- PowerSpoons:setConfig(opts)
+--- Method
+--- Sets configuration overrides for the manager.
+---
+--- Parameters:
+---  * opts - Table with optional keys: manifestUrl, autoRefreshInterval, baseDir
+---
+--- Returns:
+---  * The PowerSpoons object
+function PowerSpoons:setConfig(opts)
+	self.config = opts or {}
+	return self
+end
+
+--- PowerSpoons:start()
+--- Method
+--- Starts the Power Spoons manager and menubar.
+---
+--- Returns:
+---  * The PowerSpoons object
+function PowerSpoons:start()
+	if self.manager then
+		return self
+	end
+	self.manager = createManager(self.config)
+	self.manager.init()
+	return self
+end
+
+--- PowerSpoons:stop()
+--- Method
+--- Stops the Power Spoons manager and cleans up runtime resources.
+---
+--- Returns:
+---  * The PowerSpoons object
+function PowerSpoons:stop()
+	if self.manager and self.manager.stop then
+		self.manager.stop()
+	end
+	self.manager = nil
+	return self
+end
+
+return PowerSpoons
