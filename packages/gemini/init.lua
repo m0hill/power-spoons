@@ -30,6 +30,7 @@ return function(manager)
 	local settings = {
 		enableNotify = manager.getSetting(PACKAGE_ID, "enableNotify", true),
 		enableSound = manager.getSetting(PACKAGE_ID, "enableSound", true),
+		prompt = manager.getSetting(PACKAGE_ID, "prompt", nil),
 	}
 
 	local state = {
@@ -148,7 +149,7 @@ return function(manager)
 							},
 						},
 						{
-							text = CONFIG.PROMPT,
+							text = getPrompt(),
 						},
 					},
 				},
@@ -293,8 +294,47 @@ return function(manager)
 					saveSetting("enableSound", not settings.enableSound)
 				end,
 			},
+			{ title = "-" },
+			{
+				title = settings.prompt and "Edit Prompt (Custom)" or "Set Prompt (Default)",
+				fn = function()
+					editPrompt()
+				end,
+			},
+			{
+				title = "Reset Prompt to Default",
+				disabled = settings.prompt == nil,
+				fn = function()
+					setPrompt(nil)
+				end,
+			},
 		}
 	end
 
 	return P
 end
+	local function getPrompt()
+		if settings.prompt and settings.prompt ~= "" then
+			return settings.prompt
+		end
+		return CONFIG.PROMPT
+	end
+
+	local function setPrompt(newPrompt)
+		if newPrompt and newPrompt ~= "" then
+			settings.prompt = newPrompt
+			manager.setSetting(PACKAGE_ID, "prompt", newPrompt)
+		else
+			settings.prompt = nil
+			manager.setSetting(PACKAGE_ID, "prompt", nil)
+		end
+	end
+
+	local function editPrompt()
+		local current = settings.prompt or ""
+		local hint = "Enter a custom prompt for Gemini OCR. Leave empty to use default."
+		local button, text = hs.dialog.textPrompt("Gemini Prompt", hint, current, "Save", "Cancel")
+		if button == "Save" then
+			setPrompt(text)
+		end
+	end

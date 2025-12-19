@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+./scripts/bump_versions.sh --staged
+git add manifest.json packages/manager/init.lua

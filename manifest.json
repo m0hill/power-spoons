@@ -1,12 +1,25 @@
 {
-  "version": "1.0.0",
+  "version": "2025.12.19.0804",
   "packages": [
+    {
+      "id": "manager",
+      "name": "Power Spoons Manager",
+      "description": "Core Power Spoons manager.",
+      "version": "2025.12.19.0804",
+      "author": "m0hill",
+      "defaultEnabled": true,
+      "internal": true,
+      "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/manager/init.lua",
+      "readme": null,
+      "secrets": [],
+      "dependencies": {}
+    },
     {
       "id": "whisper",
       "name": "Whisper Transcription",
       "description": "Hold hotkey to record and auto-paste transcription.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/whisper/README.md",
-      "version": "1.1.1",
+      "version": "2025.12.19.0804",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkeys": [
@@ -25,7 +38,9 @@
         }
       ],
       "dependencies": {
-        "system": ["sox"],
+        "system": [
+          "sox"
+        ],
         "note": "Install sox via: brew install sox"
       }
     },
@@ -34,7 +49,7 @@
       "name": "Gemini OCR",
       "description": "Screenshot OCR using Google Gemini.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/gemini/README.md",
-      "version": "1.1.1",
+      "version": "2025.12.19.0804",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkeys": [
@@ -59,14 +74,16 @@
       "name": "Spotify Lyrics",
       "description": "Floating synchronized lyrics overlay.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/lyrics/README.md",
-      "version": "1.0.1",
+      "version": "2025.12.19.0804",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkey": null,
       "source": "https://raw.githubusercontent.com/m0hill/power-spoons/main/packages/lyrics/init.lua",
       "secrets": [],
       "dependencies": {
-        "apps": ["Spotify"],
+        "apps": [
+          "Spotify"
+        ],
         "note": "Requires Spotify app to be installed"
       }
     }

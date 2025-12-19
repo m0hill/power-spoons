@@ -155,20 +155,22 @@ Each package has its own settings accessible from its submenu:
 Power Spoons uses a **remote package system** that's simple and secure:
 
 1. **You install once**: Add the Spoon to `~/.hammerspoon/Spoons/PowerSpoons.spoon`
-2. **Manager fetches packages**: When you install a package, it's downloaded from GitHub
-3. **Auto-updates**: The package list refreshes automatically (every 24 hours) or manually via "Refresh" button
-4. **Local caching**: Downloaded packages are cached in `~/.hammerspoon/powerspoons/cache/`
-5. **Safe execution**: Package code is loaded in a sandbox and can only access the manager API
+2. **Bootstrap fetches the manager**: The manager code is downloaded from GitHub on first run
+3. **Manager fetches packages**: When you install a package, it's downloaded from GitHub
+4. **Auto-updates**: The package list refreshes automatically (every 24 hours) or manually via "Refresh" button
+5. **Local caching**: Downloaded packages (including the manager) are cached in `~/.hammerspoon/powerspoons/cache/`
+6. **Safe execution**: Package code is loaded in a sandbox and can only access the manager API
 
 **What gets stored where:**
-- **Manager code**: In `~/.hammerspoon/Spoons/PowerSpoons.spoon/`
+- **Bootstrap code**: In `~/.hammerspoon/Spoons/PowerSpoons.spoon/`
+- **Manager code**: Cached in `~/.hammerspoon/powerspoons/cache/manager.lua`
 - **Package list**: Fetched from `manifest.json` on GitHub, cached locally
 - **Package code**: Downloaded from GitHub when installed, cached locally
 - **Your settings**: Installed packages, enabled state, API keys → stored as JSON files
 
 **Security:**
-- ✅ Manager code is visible and isolated (Spoon)
-- ✅ Package code is fetched from the official repo only
+- ✅ Bootstrap code is visible and isolated (Spoon)
+- ✅ Manager and packages are fetched from the official repo only
 - ✅ API keys stored in `~/.hammerspoon/powerspoons/secrets.json`
 - ✅ All code runs in Hammerspoon's Lua sandbox
 
@@ -289,12 +291,13 @@ See [AGENTS.md](AGENTS.md) for detailed guidelines:
 ~/.hammerspoon/
 ├── init.lua                          # Your config (loads the Power Spoons Spoon)
 ├── Spoons/
-│   └── PowerSpoons.spoon/            # Power Spoons manager code
+│   └── PowerSpoons.spoon/            # Power Spoons bootstrap
 └── powerspoons/                      # Runtime state and caches
     ├── state.json
     ├── secrets.json
     ├── settings/
     └── cache/
+        └── manager.lua
 ```
 
 Settings and secrets are stored as JSON files under `~/.hammerspoon/powerspoons/`.
