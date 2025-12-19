@@ -6,7 +6,7 @@
       "name": "Whisper Transcription",
       "description": "Hold hotkey to record and auto-paste transcription.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/whisper/README.md",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkeys": [
@@ -34,7 +34,7 @@
       "name": "Gemini OCR",
       "description": "Screenshot OCR using Google Gemini.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/gemini/README.md",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkeys": [
@@ -59,7 +59,7 @@
       "name": "Spotify Lyrics",
       "description": "Floating synchronized lyrics overlay.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/lyrics/README.md",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkey": null,

@@ -22,6 +22,7 @@ return function(manager)
 	local dragContext = nil
 	local dragEventTap = nil
 	local text_size_state = nil
+	local last_error = nil
 	local ensureOverlay
 
 	local function formatTime(seconds)
@@ -314,6 +315,14 @@ return function(manager)
 		overlay["next"].text = secondaryText or ""
 	end
 
+	local function logErrorOnce(key, message)
+		if key == last_error then
+			return
+		end
+		last_error = key
+		manager.notifyError("Lyrics", message, { notify = false })
+	end
+
 	local function getSpotifyState()
 		local script = [[
 set spotifyRunning to false
@@ -338,12 +347,19 @@ else
 end if
 ]]
 
-		local ok, result = hs.osascript.applescript(script)
+		local okScript, ok, result = pcall(hs.osascript.applescript, script)
+		if not okScript then
+			logErrorOnce("spotify-applescript", "Spotify AppleScript error: " .. tostring(ok))
+			return { playerState = "error" }
+		end
+
 		if not ok then
+			logErrorOnce("spotify-applescript", "Spotify AppleScript failed: " .. tostring(result))
 			return { playerState = "error" }
 		end
 
 		if type(result) ~= "table" then
+			logErrorOnce("spotify-response", "Spotify AppleScript returned unexpected data")
 			return { playerState = "unknown" }
 		end
 
@@ -417,6 +433,10 @@ end if
 			return
 		end
 
+		if state and state.playerState ~= "error" and not (lyricsState and lyricsState.error) then
+			last_error = nil
+		end
+
 		local trackLabel = ""
 		if state.name and state.artist then
 			trackLabel = string.format("%s — %s", state.name, state.artist)
@@ -468,6 +488,7 @@ end if
 		end
 
 		if status ~= 200 or not body or body == "" then
+			logErrorOnce("lyrics-http", "Lyrics request failed (HTTP " .. tostring(status) .. ")")
 			lyricsState = { error = "Lyrics unavailable" }
 			render(currentTrackState or state)
 			return
@@ -475,6 +496,7 @@ end if
 
 		local ok, payload = pcall(hs.json.decode, body)
 		if not ok or type(payload) ~= "table" then
+			logErrorOnce("lyrics-parse", "Lyrics response could not be decoded")
 			lyricsState = { error = "Lyrics unavailable" }
 			render(currentTrackState or state)
 			return
@@ -482,6 +504,7 @@ end if
 
 		local entries = parseSyncedLyrics(payload.syncedLyrics)
 		if not entries or #entries == 0 then
+			logErrorOnce("lyrics-empty", "No synced lyrics found")
 			lyricsState = { error = "No synced lyrics found" }
 			render(currentTrackState or state)
 			return
@@ -493,6 +516,7 @@ end if
 
 	local function fetchLyrics(state)
 		if not state or not state.name or not state.artist then
+			logErrorOnce("lyrics-track", "Missing track info for lyrics request")
 			lyricsState = { error = "Missing track info" }
 			render(state)
 			return

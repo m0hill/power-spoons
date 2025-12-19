@@ -267,6 +267,23 @@ local PowerSpoons = (function()
 		notification:send()
 	end
 
+	-- Error notification that also logs to the Hammerspoon console.
+	-- options: { withdrawAfter = number, sound = string, soundEnabled = bool, notify = bool }
+	function M.notifyError(title, text, options)
+		options = options or {}
+		logError(title or "Error", text or "unknown error")
+
+		if options.notify == false then
+			return
+		end
+
+		M.notify(title, text, {
+			withdrawAfter = options.withdrawAfter,
+			sound = options.sound,
+			soundEnabled = options.soundEnabled,
+		})
+	end
+
 	-- Universal Sound API for packages
 	-- type: "success", "error", "warning", "start", "stop", "info", "capture", "process", "cancel"
 	function M.playSound(soundType)
@@ -987,7 +1004,7 @@ local PowerSpoons = (function()
 						anyInstalled = true
 					end
 
-local status = ""
+					local status = ""
 					if flags.enabled then
 						status = " ✓"
 					else
@@ -1066,7 +1083,7 @@ local status = ""
 						})
 					end
 
-table.insert(submenu, {
+					table.insert(submenu, {
 						title = "Info",
 						menu = infoSubmenu,
 					})

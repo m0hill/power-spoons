@@ -67,6 +67,14 @@ return function(manager)
 		manager.notify(title, text, { sound = sound, soundEnabled = settings.enableSound })
 	end
 
+	local function notifyError(title, text, sound)
+		manager.notifyError(title, text, {
+			sound = sound,
+			soundEnabled = settings.enableSound,
+			notify = settings.enableNotify,
+		})
+	end
+
 	local function playSound(soundType)
 		if not settings.enableSound then
 			return
@@ -333,7 +341,7 @@ return function(manager)
 	local function transcribeAudio(path)
 		local apiKey = manager.getSecret("GROQ_API_KEY")
 		if not apiKey or apiKey == "" then
-			notify("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
+			notifyError("Whisper", "Missing Groq API key.\nSet it via Power Spoons → Secrets.")
 			playSound("error")
 			if path then
 				os.remove(path)
@@ -346,7 +354,7 @@ return function(manager)
 			if path then
 				os.remove(path)
 			end
-			notify("Whisper", "Recording too short. Please speak longer.")
+			notifyError("Whisper", "Recording too short. Please speak longer.")
 			return
 		end
 
@@ -402,7 +410,7 @@ return function(manager)
 			out = (out or ""):gsub("%s+$", "")
 
 			if exitCode ~= 0 then
-				notify("Whisper", "Network error while calling API.")
+				notifyError("Whisper", "Network error while calling API.")
 				playSound("error")
 				telemetry = nil
 				return
@@ -410,7 +418,7 @@ return function(manager)
 
 			local ok, body = pcall(hs.json.decode, out or "")
 			if not ok or not body then
-				notify("Whisper", "Invalid API response.")
+				notifyError("Whisper", "Invalid API response.")
 				playSound("error")
 				telemetry = nil
 				return
@@ -418,7 +426,7 @@ return function(manager)
 
 			if body.error then
 				local msg = body.error.message or "Unknown API error"
-				notify("Whisper", "Transcription error: " .. msg)
+				notifyError("Whisper", "Transcription error: " .. msg)
 				playSound("error")
 				telemetry = nil
 				return
@@ -426,7 +434,7 @@ return function(manager)
 
 			local text = (body.text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 			if text == "" then
-				notify("Whisper", "No speech detected in audio.")
+				notifyError("Whisper", "No speech detected in audio.")
 				telemetry = nil
 				return
 			end
@@ -467,7 +475,7 @@ return function(manager)
 		wav_path = nil
 
 		if not path then
-			notify("Whisper", "No recording captured.")
+			notifyError("Whisper", "No recording captured.")
 			telemetry = nil
 			return
 		end
@@ -512,7 +520,7 @@ return function(manager)
 		if not rec_path then
 			rec_path = which("rec")
 			if not rec_path then
-				notify("Whisper", "'sox' is not installed.\nInstall via: brew install sox")
+				notifyError("Whisper", "'sox' is not installed.\nInstall via: brew install sox")
 				playSound("error")
 				return
 			end
@@ -538,7 +546,7 @@ return function(manager)
 		if not rec_task:start() then
 			is_recording = false
 			wav_path = nil
-			notify("Whisper", "Could not start audio recording.")
+			notifyError("Whisper", "Could not start audio recording.")
 			playSound("error")
 			telemetry = nil
 			return

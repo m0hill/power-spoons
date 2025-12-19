@@ -58,6 +58,13 @@ return function(manager)
 		manager.notify(title, text, { withdrawAfter = 4 })
 	end
 
+	local function notifyError(title, text)
+		manager.notifyError(title, text, {
+			withdrawAfter = 4,
+			notify = settings.enableNotify,
+		})
+	end
+
 	local function cleanUp(path)
 		if path and hs.fs.attributes(path) then
 			os.remove(path)
@@ -113,7 +120,7 @@ return function(manager)
 		local apiKey = manager.getSecret("GEMINI_API_KEY")
 		if not apiKey or apiKey == "" then
 			reset(path)
-			notify("Gemini OCR", "GEMINI_API_KEY is missing")
+			notifyError("Gemini OCR", "GEMINI_API_KEY is missing")
 			playSound("error")
 			return
 		end
@@ -121,7 +128,7 @@ return function(manager)
 		local file = io.open(path, "rb")
 		if not file then
 			reset(path)
-			notify("Gemini OCR", "Unable to read screenshot")
+			notifyError("Gemini OCR", "Unable to read screenshot")
 			playSound("error")
 			return
 		end
@@ -167,7 +174,7 @@ return function(manager)
 
 			if not resultText or resultText == "" then
 				reset(path)
-				notify("Gemini OCR", "Failed to interpret API response")
+				notifyError("Gemini OCR", "Failed to interpret API response")
 				playSound("error")
 				return
 			end
@@ -200,7 +207,7 @@ return function(manager)
 				state.captureTask:terminate()
 			end
 			reset(tmpPath)
-			notify("Gemini OCR", "Screenshot timed out")
+			notifyError("Gemini OCR", "Screenshot timed out")
 		end)
 
 		state.captureTask = hs.task.new("/usr/sbin/screencapture", function(exitCode)
@@ -219,7 +226,7 @@ return function(manager)
 
 		if not state.captureTask:start() then
 			reset(tmpPath)
-			notify("Gemini OCR", "Unable to start screenshot")
+			notifyError("Gemini OCR", "Unable to start screenshot")
 			playSound("error")
 			return
 		end
