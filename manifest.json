@@ -1,5 +1,5 @@
 {
-  "version": "2025.12.19.0804",
+  "version": "2025.12.19.0812",
   "packages": [
     {
       "id": "manager",
@@ -49,7 +49,7 @@
       "name": "Gemini OCR",
       "description": "Screenshot OCR using Google Gemini.",
       "readme": "https://github.com/m0hill/power-spoons/blob/main/packages/gemini/README.md",
-      "version": "2025.12.19.0804",
+      "version": "2025.12.19.0812",
       "author": "m0hill",
       "defaultEnabled": false,
       "hotkeys": [
